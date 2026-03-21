@@ -424,6 +424,7 @@ func main() {
 		api.GET("/resumes", handler.List)
 		api.PUT("/resumes/:id", handler.Update)
 		api.DELETE("/resumes/:id", handler.Delete)
+	 api.PUT("/resumes/:id/status", handler.UpdateStatus)
 	}
 
 	addr := "0.0.0.0:" + config.ServerPort
