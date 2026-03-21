@@ -1,0 +1,73 @@
+// proto/resume.proto
+syntax = "proto3";
+
+package resume;
+
+option go_package = "github.com/example/ats-platform/internal/shared/pb/resume";
+
+// Resume represents a candidate's resume
+message Resume {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string source = 5;
+  string file_url = 6;
+  bytes parsed_data = 7;
+  string status = 8;
+  int64 created_at = 9;
+  int64 updated_at = 10;
+}
+
+// GetResumeRequest
+message GetResumeRequest {
+  string id = 1;
+}
+
+// CreateResumeRequest
+message CreateResumeRequest {
+  string name = 1;
+  string email = 2;
+  string phone = 3;
+  string source = 4;
+  string file_url = 5;
+  bytes parsed_data = 6;
+}
+
+// UpdateResumeRequest
+message UpdateResumeRequest {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  bytes parsed_data = 5;
+}
+
+// UpdateStatusRequest
+message UpdateStatusRequest {
+  string id = 1;
+  string status = 2;
+}
+
+// ListResumesRequest
+message ListResumesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string status = 3;
+  string source = 4;
+}
+
+// ListResumesResponse
+message ListResumesResponse {
+  repeated Resume resumes = 1;
+  int64 total = 2;
+}
+
+// ResumeService provides gRPC methods for resume management
+service ResumeService {
+  rpc GetResume(GetResumeRequest) returns (Resume);
+  rpc CreateResume(CreateResumeRequest) returns (Resume);
+  rpc UpdateResume(UpdateResumeRequest) returns (Resume);
+  rpc UpdateStatus(UpdateStatusRequest) returns (Resume);
+  rpc ListResumes(ListResumesRequest) returns (ListResumesResponse);
+}

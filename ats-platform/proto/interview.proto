@@ -1,0 +1,122 @@
+// proto/interview.proto
+syntax = "proto3";
+
+package interview;
+
+option go_package = "github.com/example/ats-platform/internal/shared/pb/interview";
+
+// Interview represents an interview record
+message Interview {
+  string id = 1;
+  string resume_id = 2;
+  int32 round = 3;
+  string interviewer = 4;
+  int64 scheduled_at = 5;
+  string status = 6;
+  int64 created_at = 7;
+  int64 updated_at = 8;
+}
+
+// Feedback represents interview feedback
+message Feedback {
+  string id = 1;
+  string interview_id = 2;
+  int32 rating = 3;
+  string content = 4;
+  string recommendation = 5;
+  int64 created_at = 6;
+}
+
+// Portfolio represents a candidate's portfolio item
+message Portfolio {
+  string id = 1;
+  string resume_id = 2;
+  string title = 3;
+  string description = 4;
+  string file_url = 5;
+  string file_type = 6;
+  int64 created_at = 7;
+}
+
+// GetInterviewRequest
+message GetInterviewRequest {
+  string id = 1;
+}
+
+// CreateInterviewRequest
+message CreateInterviewRequest {
+  string resume_id = 1;
+  int32 round = 2;
+  string interviewer = 3;
+  int64 scheduled_at = 4;
+}
+
+// UpdateInterviewStatusRequest
+message UpdateInterviewStatusRequest {
+  string id = 1;
+  string status = 2;
+}
+
+// ListInterviewsRequest
+message ListInterviewsRequest {
+  string resume_id = 1;
+  string status = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// ListInterviewsResponse
+message ListInterviewsResponse {
+  repeated Interview interviews = 1;
+  int64 total = 2;
+}
+
+// CreateFeedbackRequest
+message CreateFeedbackRequest {
+  string interview_id = 1;
+  int32 rating = 2;
+  string content = 3;
+  string recommendation = 4;
+}
+
+// GetFeedbackRequest
+message GetFeedbackRequest {
+  string interview_id = 1;
+}
+
+// CreatePortfolioRequest
+message CreatePortfolioRequest {
+  string resume_id = 1;
+  string title = 2;
+  string description = 3;
+  string file_url = 4;
+  string file_type = 5;
+}
+
+// ListPortfoliosRequest
+message ListPortfoliosRequest {
+  string resume_id = 1;
+}
+
+// ListPortfoliosResponse
+message ListPortfoliosResponse {
+  repeated Portfolio portfolios = 1;
+  int64 total = 2;
+}
+
+// InterviewService provides gRPC methods for interview management
+service InterviewService {
+  // Interview methods
+  rpc GetInterview(GetInterviewRequest) returns (Interview);
+  rpc CreateInterview(CreateInterviewRequest) returns (Interview);
+  rpc UpdateInterviewStatus(UpdateInterviewStatusRequest) returns (Interview);
+  rpc ListInterviews(ListInterviewsRequest) returns (ListInterviewsResponse);
+
+  // Feedback methods
+  rpc CreateFeedback(CreateFeedbackRequest) returns (Feedback);
+  rpc GetFeedback(GetFeedbackRequest) returns (Feedback);
+
+  // Portfolio methods
+  rpc CreatePortfolio(CreatePortfolioRequest) returns (Portfolio);
+  rpc ListPortfolios(ListPortfoliosRequest) returns (ListPortfoliosResponse);
+}
