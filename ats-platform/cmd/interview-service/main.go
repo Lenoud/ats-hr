@@ -1,28 +1,21 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	 "github.com/google/uuid"
+	"github.com/google/uuid"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
-	 "github.com/example/ats-platform/internal/interview/model"
+	"github.com/example/ats-platform/internal/interview/model"
 )
 
-// 内存存储 (用于测试)
-type MemoryStore struct {
-	interviews map[uuid.UUID]*model.Interview
-	feedbacks  map[uuid.UUID]*model.Feedback
-	portfolios map[uuid.UUID]*model.Portfolio
-}
-
-func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{
-		interviews: make(map[uuid.UUID]*model.Interview),
-		feedbacks:  make(map[uuid.UUID]*model.Feedback),
-		portfolios: make(map[uuid.UUID]*model.Portfolio),
-	}
-}
+var db *gorm.DB
 
 // HTML 前端页面
 const indexHTML = `<!DOCTYPE html>
@@ -85,7 +78,7 @@ const indexHTML = `<!DOCTYPE html>
         </div>
 
         <div class="section">
-            <h2>📋 韥询面试</h2>
+            <h2>📋 查询面试</h2>
             <div class="form-group">
                 <label>简历ID:</label>
                 <input type="text" id="searchResumeId" value="550e8400-e29b-41d4-a716-446655440001">
@@ -254,7 +247,7 @@ const indexHTML = `<!DOCTYPE html>
             })
             .then(r => r.json())
             .then(d => { showResult(d); })
-            .catch(e => showResult({error: e.message});
+            .catch(e => showResult({error: e.message}));
         }
         function createPortfolio() {
             const resumeId = document.getElementById('portfolioResumeId').value;
@@ -270,7 +263,7 @@ const indexHTML = `<!DOCTYPE html>
             })
             .then(r => r.json())
             .then(d => { showResult(d); listPortfolios(); })
-            .catch(e => showResult({error: e.message});
+            .catch(e => showResult({error: e.message}));
         }
         function listPortfolios() {
             const resumeId = document.getElementById('portfolioResumeId').value;
@@ -296,7 +289,7 @@ const indexHTML = `<!DOCTYPE html>
             fetch('/api/v1/portfolios/' + id, {method: 'DELETE'})
                 .then(r => r.json())
             .then(d => { showResult(d); listPortfolios(); })
-            .catch(e => showResult({error: e.message});
+            .catch(e => showResult({error: e.message}));
         }
         // 初始化
         document.getElementById('scheduledAt').value = new Date().toISOString().slice(0, 16);
@@ -304,9 +297,46 @@ const indexHTML = `<!DOCTYPE html>
 </body>
 </html>`
 
-var store = NewMemoryStore()
+func initDB() error {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		host := getEnv("DB_HOST", "localhost")
+		port := getEnv("DB_PORT", "5432")
+		user := getEnv("DB_USER", "postgres")
+		password := getEnv("DB_PASSWORD", "postgres")
+		dbname := getEnv("DB_NAME", "ats")
+		sslmode := getEnv("DB_SSLMODE", "disable")
+		dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+			host, port, user, password, dbname, sslmode)
+	}
+
+	var err error
+	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
+	if err != nil {
+		return err
+	}
+
+	// 自动迁移
+	return db.AutoMigrate(&model.Interview{}, &model.Feedback{}, &model.Portfolio{})
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 func main() {
+	// 初始化数据库
+	if err := initDB(); err != nil {
+		fmt.Printf("Failed to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Connected to PostgreSQL database")
+
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
@@ -330,7 +360,18 @@ func main() {
 
 	// 健康检查
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"service": "interview-service", "status": "ok", "time": time.Now().Format(time.RFC3339)})
+		// 检查数据库连接
+		sqlDB, err := db.DB()
+		dbStatus := "connected"
+		if err != nil || sqlDB.Ping() != nil {
+			dbStatus = "disconnected"
+		}
+		c.JSON(200, gin.H{
+			"service": "interview-service",
+			"status":  "ok",
+			"db":      dbStatus,
+			"time":    time.Now().Format(time.RFC3339),
+		})
 	})
 
 	r.GET("/ready", func(c *gin.Context) {
@@ -341,183 +382,208 @@ func main() {
 	api := r.Group("/api/v1")
 	{
 		// 面试
-        api.POST("/interviews", createInterviewHandler)
-        api.GET("/interviews/:id", getInterviewHandler)
-        api.PUT("/interviews/:id/status", updateInterviewStatusHandler)
-        api.DELETE("/interviews/:id", deleteInterviewHandler)
-        api.GET("/resumes/:id/interviews", listInterviewsByResumeHandler)
-        // 面评
-        api.POST("/interviews/:id/feedback", submitFeedbackHandler)
-        api.GET("/interviews/:id/feedback", getFeedbackHandler)
-        // 作品集
-        api.POST("/resumes/:id/portfolios", createPortfolioHandler)
-        api.GET("/resumes/:id/portfolios", listPortfoliosHandler)
-        api.DELETE("/portfolios/:id", deletePortfolioHandler)
-    }
+		api.POST("/interviews", createInterviewHandler)
+		api.GET("/interviews/:id", getInterviewHandler)
+		api.PUT("/interviews/:id/status", updateInterviewStatusHandler)
+		api.DELETE("/interviews/:id", deleteInterviewHandler)
+		api.GET("/resumes/:id/interviews", listInterviewsByResumeHandler)
+		// 面评
+		api.POST("/interviews/:id/feedback", submitFeedbackHandler)
+		api.GET("/interviews/:id/feedback", getFeedbackHandler)
+		// 作品集
+		api.POST("/resumes/:id/portfolios", createPortfolioHandler)
+		api.GET("/resumes/:id/portfolios", listPortfoliosHandler)
+		api.DELETE("/portfolios/:id", deletePortfolioHandler)
+	}
 
-    println("Interview Service running on http://0.0.0.0:8082")
-    r.Run("0.0.0.0:8082")
+	println("Interview Service running on http://0.0.0.0:8082")
+	r.Run("0.0.0.0:8082")
 }
 
 // Handlers
 func createInterviewHandler(c *gin.Context) {
-    var req model.CreateInterviewRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": err.Error()})
-        return
-    }
-    resumeID, err := uuid.Parse(req.ResumeID)
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid resume_id"})
-        return
-    }
-    interview := &model.Interview{
-        ID:          uuid.New(),
-        ResumeID:    resumeID,
-        Round:       req.Round,
-        Interviewer: req.Interviewer,
-        ScheduledAt: req.ScheduledAt,
-        Status:      model.InterviewStatusScheduled,
-        CreatedAt:   time.Now(),
-        UpdatedAt:   time.Now(),
-    }
-    store.interviews[interview.ID] = interview
-    c.JSON(201, gin.H{"data": interview})
+	var req model.CreateInterviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	resumeID, err := uuid.Parse(req.ResumeID)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid resume_id"})
+		return
+	}
+	interview := &model.Interview{
+		ID:          uuid.New(),
+		ResumeID:    resumeID,
+		Round:       req.Round,
+		Interviewer: req.Interviewer,
+		ScheduledAt: req.ScheduledAt,
+		Status:      model.InterviewStatusScheduled,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	if err := db.Create(interview).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(201, gin.H{"data": interview})
 }
+
 func getInterviewHandler(c *gin.Context) {
-    id, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid id"})
-        return
-    }
-    interview, ok := store.interviews[id]
-    if !ok {
-        c.JSON(404, gin.H{"error": "not found"})
-        return
-    }
-    c.JSON(200, gin.H{"data": interview})
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid id"})
+		return
+	}
+	var interview model.Interview
+	if err := db.First(&interview, "id = ?", id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "not found"})
+		return
+	}
+	c.JSON(200, gin.H{"data": interview})
 }
+
 func listInterviewsByResumeHandler(c *gin.Context) {
-    resumeID, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid resume_id"})
-        return
-    }
-    var result []*model.Interview
-    for _, i := range store.interviews {
-        if i.ResumeID == resumeID {
-            result = append(result, i)
-        }
-    }
-    c.JSON(200, gin.H{"data": result})
+	resumeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid resume_id"})
+		return
+	}
+	var interviews []model.Interview
+	if err := db.Where("resume_id = ?", resumeID).Find(&interviews).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"data": interviews})
 }
+
 func updateInterviewStatusHandler(c *gin.Context) {
-    id, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid id"})
-        return
-    }
-    var req model.UpdateInterviewStatusRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": err.Error()})
-        return
-    }
-    interview, ok := store.interviews[id]
-    if !ok {
-        c.JSON(404, gin.H{"error": "not found"})
-        return
-    }
-    interview.Status = model.InterviewStatus(req.Status)
-    interview.UpdatedAt = time.Now()
-    c.JSON(200, gin.H{"data": interview})
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid id"})
+		return
+	}
+	var req model.UpdateInterviewStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	var interview model.Interview
+	if err := db.First(&interview, "id = ?", id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "not found"})
+		return
+	}
+	interview.Status = model.InterviewStatus(req.Status)
+	interview.UpdatedAt = time.Now()
+	if err := db.Save(&interview).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"data": interview})
 }
+
 func deleteInterviewHandler(c *gin.Context) {
-    id, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid id"})
-        return
-    }
-    delete(store.interviews, id)
-    c.JSON(200, gin.H{"message": "deleted"})
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := db.Delete(&model.Interview{}, "id = ?", id).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "deleted"})
 }
+
 func submitFeedbackHandler(c *gin.Context) {
-    interviewID, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid interview_id"})
-        return
-    }
-    var req model.SubmitFeedbackRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": err.Error()})
-        return
-    }
-    feedback := &model.Feedback{
-        ID:             uuid.New(),
-        InterviewID:    interviewID,
-        Rating:         req.Rating,
-        Content:        req.Content,
-        Recommendation: model.Recommendation(req.Recommendation),
-        CreatedAt:      time.Now(),
-    }
-    store.feedbacks[feedback.ID] = feedback
-    c.JSON(201, gin.H{"data": feedback})
+	interviewID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid interview_id"})
+		return
+	}
+	var req model.SubmitFeedbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	feedback := &model.Feedback{
+		ID:             uuid.New(),
+		InterviewID:    interviewID,
+		Rating:         req.Rating,
+		Content:        req.Content,
+		Recommendation: model.Recommendation(req.Recommendation),
+		CreatedAt:      time.Now(),
+	}
+	if err := db.Create(feedback).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(201, gin.H{"data": feedback})
 }
+
 func getFeedbackHandler(c *gin.Context) {
-    interviewID, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid interview_id"})
-        return
-    }
-    for _, f := range store.feedbacks {
-        if f.InterviewID == interviewID {
-            c.JSON(200, gin.H{"data": f})
-            return
-        }
-    }
-    c.JSON(404, gin.H{"error": "not found"})
+	interviewID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid interview_id"})
+		return
+	}
+	var feedback model.Feedback
+	if err := db.Where("interview_id = ?", interviewID).First(&feedback).Error; err != nil {
+		c.JSON(404, gin.H{"error": "not found"})
+		return
+	}
+	c.JSON(200, gin.H{"data": feedback})
 }
+
 func createPortfolioHandler(c *gin.Context) {
-    resumeID, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid resume_id"})
-        return
-    }
-    var req model.CreatePortfolioRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": err.Error()})
-        return
-    }
-    portfolio := &model.Portfolio{
-        ID:        uuid.New(),
-        ResumeID:  resumeID,
-        Title:     req.Title,
-        FileURL:   req.FileURL,
-        FileType:  model.FileType(req.FileType),
-        CreatedAt: time.Now(),
-    }
-    store.portfolios[portfolio.ID] = portfolio
-    c.JSON(201, gin.H{"data": portfolio})
+	resumeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid resume_id"})
+		return
+	}
+	var req model.CreatePortfolioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	portfolio := &model.Portfolio{
+		ID:        uuid.New(),
+		ResumeID:  resumeID,
+		Title:     req.Title,
+		FileURL:   req.FileURL,
+		FileType:  model.FileType(req.FileType),
+		CreatedAt: time.Now(),
+	}
+	if err := db.Create(portfolio).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(201, gin.H{"data": portfolio})
 }
+
 func listPortfoliosHandler(c *gin.Context) {
-    resumeID, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid resume_id"})
-        return
-    }
-    var result []*model.Portfolio
-    for _, p := range store.portfolios {
-        if p.ResumeID == resumeID {
-            result = append(result, p)
-        }
-    }
-    c.JSON(200, gin.H{"data": result})
+	resumeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid resume_id"})
+		return
+	}
+	var portfolios []model.Portfolio
+	if err := db.Where("resume_id = ?", resumeID).Find(&portfolios).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"data": portfolios})
 }
+
 func deletePortfolioHandler(c *gin.Context) {
-    id, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid id"})
-        return
-    }
-    delete(store.portfolios, id)
-    c.JSON(200, gin.H{"message": "deleted"})
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := db.Delete(&model.Portfolio{}, "id = ?", id).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "deleted"})
 }
