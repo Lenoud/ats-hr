@@ -2,29 +2,29 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
-	 "time"
+	"time"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 // 后端服务配置
 var services = map[string]string{
-    "resume":    "http://localhost:8081",
-    "interview": "http://localhost:8082",
-    "search":    "http://localhost:8083",
+	"resume":    "http://localhost:8081",
+	"interview": "http://localhost:8082",
+	"search":    "http://localhost:8083",
 }
 
 // 检查服务状态
 func checkServiceStatus(serviceURL string) string {
-    client := http.Client{Timeout: 2 * time.Second}
-    resp, err := http.Get(serviceURL + "/health")
-    if err != nil {
-        return "offline"
-    }
-    defer resp.Body.Close()
-    return "ok"
+	resp, err := http.Get(serviceURL + "/health")
+	if err != nil {
+		return "offline"
+	}
+	defer resp.Body.Close()
+	return "ok"
 }
 
 // HTML 前端页面
@@ -38,11 +38,11 @@ const indexHTML = `<!DOCTYPE html>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
-        .header { background: linear-gradient(135deg, #1976d3, #1565c0); color: white; padding: 20px; text-align: center; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #1976d3, #1565c0); color: white; padding: 20px; text-align: center; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0 1); }
         .header h1 { font-size: 28px; margin-bottom: 5px; }
         .header p { opacity: 0.9; }
         .status-bar { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
-        .status-card { flex: 1; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); min-width: 200px; }
+        .status-card { flex: 1; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,    1); min-width: 200px; }
         .status-card h3 { color: #666; font-size: 14px; margin-bottom: 5px; }
         .status-card .value { font-size: 20px; font-weight: bold; }
         .status-card.ok .value { color: #4caf50; }
@@ -104,73 +104,102 @@ const indexHTML = `<!DOCTYPE html>
 </html>`
 
 func main() {
-    gin.SetMode(gin.ReleaseMode)
-    r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.Default()
 
-    // CORS
-    r.Use(func(c *gin.Context) {
-        c.Header("Access-Control-Allow-Origin", "*")
-        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        if c.Request.Method == "OPTIONS" {
-            c.AbortWithStatus(204)
-            return
-        }
-        c.Next()
-    })
+	// CORS
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
 
-    // 首页
-    r.GET("/", func(c *gin.Context) {
-        c.Header("Content-Type", "text/html; charset=utf-8")
-        c.String(200, indexHTML)
-    })
+	// 首页
+	r.GET("/", func(c *gin.Context) {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(200, indexHTML)
+	})
 
-    // 健康检查
-    r.GET("/health", func(c *gin.Context) {
-        c.JSON(200, gin.H{
-            "service": "api-gateway",
-            "status":  "ok",
-            "services": gin.H{
-                "resume":    checkServiceStatus(services["resume"]),
-                "interview": checkServiceStatus(services["interview"]),
-                "search":    checkServiceStatus(services["search"]),
+	// 健康检查
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"service": "api-gateway",
+			"status":  "ok",
+			"services": gin.H{
+				"resume":    checkServiceStatus(services["resume"]),
+				"interview": checkServiceStatus(services["interview"]),
+               	"search":    checkServiceStatus(services["search"]),
             },
-            "time": time.Now().Format(time.RFC3339),
-        })
-    })
+			"time": time.Now().Format(time.RFC3339),
+		})
+	})
 
-    // API 代理
-    api := r.Group("/api/v1")
-    {
-        // Resume Service
-        api.Any("/resumes", func(c *gin.Context) {
-            proxyRequest(c, services["resume"])
-        })
-        api.Any("/resumes/*id", func(c *gin.Context) {
-            proxyRequest(c, services["resume"])
-        })
+	// API 代理 - 使用通配符匹配所有路径
+	r.Any("/api/v1/*action", proxyHandler)
 
-        // Interview Service
-        api.Any("/interviews", func(c *gin.Context) {
-            proxyRequest(c, services["interview"])
-        })
-        api.Any("/interviews/*id", func(c *gin.Context) {
-            proxyRequest(c, services["interview"])
-        })
-        api.Any("/portfolios/*id", func(c *gin.Context) {
-            proxyRequest(c, services["interview"])
-        })
-
-        // Search Service
-        api.Any("/search", func(c *gin.Context) {
-            proxyRequest(c, services["search"])
-        })
-        api.Any("/search/*id", func(c *gin.Context) {
-            proxyRequest(c, services["search"])
-        })
-    }
-
-    fmt.Println("API Gateway running on http://0.0.0.0:8080")
-    r.Run("0.0.0.0:8080")
+	fmt.Println("API Gateway running on http://0.0.0.0:8080")
+	r.Run("0.0.0.0:8080")
 }
 
+// proxyHandler 统一处理所有代理请求
+func proxyHandler(c *gin.Context) {
+	path := c.Param("action")
+
+	// 根据路径决定转发到哪个服务
+	var targetService string
+	if strings.HasPrefix(path, "/resumes") {
+		targetService = services["resume"]
+	} else if strings.HasPrefix(path, "/interviews") || strings.HasPrefix(path, "/portfolios") {
+		targetService = services["interview"]
+	} else if strings.HasPrefix(path, "/search") {
+		targetService = services["search"]
+	} else {
+		c.JSON(404, gin.H{"error": "unknown service"})
+	 return
+	 }
+
+	// 构建目标URL
+	targetURL := targetService + "/api/v1" + path
+
+	// 添加查询参数
+	if c.Request.URL.RawQuery != "" {
+	 targetURL += "?" + c.Request.URL.RawQuery
+    }
+	// 创建请求
+    req, err := http.NewRequest(c.Request.Method, targetURL, c.Request.Body)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    // 复制请求头
+    for key, values := range c.Request.Header {
+        for _, value := range values {
+            req.Header.Add(key, value)
+        }
+    }
+
+    // 发送请求
+    client := &http.Client{Timeout: 30 * time.Second}
+    resp, err := client.Do(req)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    defer resp.Body.Close()
+
+    // 复制响应头
+    for key, values := range resp.Header {
+        for _, value := range values {
+            c.Header(key, value)
+        }
+    }
+
+    // 返回响应
+    c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), []byte{})
+    io.Copy(c.Writer, resp.Body)
+}
