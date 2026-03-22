@@ -28,17 +28,17 @@ var validStatusTransitions = map[string][]string{
 
 // Resume represents a job applicant's resume document
 type Resume struct {
-	ID         uuid.UUID              `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
-	Name       string                 `gorm:"type:varchar(255);not null"`
-	Email      string                 `gorm:"type:varchar(255)"`
-	Phone      string                 `gorm:"type:varchar(50)"`
-	Source     string                 `gorm:"type:varchar(100)"` // e.g., "LinkedIn", "Indeed", "Direct Application"
-	FileURL    string                 `gorm:"type:text"`
-	ParsedData map[string]any `gorm:"type:jsonb"`
-	Status     string                 `gorm:"type:varchar(50);default:pending"`
-	CreatedAt  time.Time              `gorm:"autoCreateTime"`
-	UpdatedAt  time.Time              `gorm:"autoUpdateTime"`
-	DeletedAt  gorm.DeletedAt         `gorm:"index"`
+	ID         uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
+	Name       string         `json:"name" gorm:"type:varchar(255);not null"`
+	Email      string         `json:"email" gorm:"type:varchar(255)"`
+	Phone      string         `json:"phone" gorm:"type:varchar(50)"`
+	Source     string         `json:"source" gorm:"type:varchar(100)"` // e.g., "LinkedIn", "Indeed", "Direct Application"
+	FileURL    string         `json:"file_url" gorm:"type:text"`
+	ParsedData map[string]any `json:"parsed_data" gorm:"type:jsonb"`
+	Status     string         `json:"status" gorm:"type:varchar(50);default:pending"`
+	CreatedAt  time.Time      `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt  time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt  gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
 }
 
 // TableName specifies the table name for GORM

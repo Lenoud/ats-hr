@@ -8,6 +8,7 @@ import (
 
 	"github.com/example/ats-platform/internal/resume/service"
 	"github.com/example/ats-platform/internal/shared/response"
+	"github.com/example/ats-platform/internal/shared/storage"
 )
 
 // ResumeHandler handles HTTP requests for resumes
@@ -156,7 +157,128 @@ func (h *ResumeHandler) UpdateStatus(c *gin.Context) {
 	response.Success(c, resume)
 }
 
-// parseIntQuery parses an integer query parameter with a default value
+// UploadFile handles POST /resumes/:id/file
+func (h *ResumeHandler) UploadFile(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid resume id")
+		return
+	}
+
+	// Get the uploaded file
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "file is required")
+		return
+	}
+	defer file.Close()
+
+	// Validate file type
+	if !storage.IsAllowedFileType(header.Filename) {
+		response.BadRequest(c, "invalid file type, only PDF, DOC, DOCX are allowed")
+		return
+	}
+
+	// Check file size (max 10MB)
+	const maxFileSize = 10 << 20 // 10MB
+	if header.Size > maxFileSize {
+		response.BadRequest(c, "file size exceeds 10MB limit")
+		return
+	}
+
+	resume, err := h.svc.UploadFile(c.Request.Context(), id, header.Filename, file, header.Size)
+	if err != nil {
+		if err == service.ErrResumeNotFound {
+			response.NotFound(c, "resume not found")
+			return
+		}
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "file uploaded successfully", gin.H{
+		"resume":   resume,
+		"file_url": resume.FileURL,
+	})
+}
+
+// ParseResume handles POST /resumes/:id/parse
+func (h *ResumeHandler) ParseResume(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid resume id")
+		return
+	}
+
+	parsed, err := h.svc.ParseResume(c.Request.Context(), id)
+	if err != nil {
+		if err == service.ErrResumeNotFound {
+			response.NotFound(c, "resume not found")
+			return
+		}
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, parsed)
+}
+
+// UploadAndParse handles POST /resumes/upload - upload, parse, and create resume in one step
+func (h *ResumeHandler) UploadAndParse(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "file is required")
+		return
+	}
+	defer file.Close()
+
+	if !storage.IsAllowedFileType(header.Filename) {
+		response.BadRequest(c, "invalid file type, only PDF, DOC, DOCX are allowed")
+		return
+	}
+
+	const maxFileSize = 10 << 20
+	if header.Size > maxFileSize {
+		response.BadRequest(c, "file size exceeds 10MB limit")
+		return
+	}
+
+	source := c.PostForm("source")
+	if source == "" {
+		source = "upload"
+	}
+
+	resume, parsed, err := h.svc.UploadAndParse(c.Request.Context(), header.Filename, file, header.Size, source)
+
+	// Handle different error scenarios
+	if err != nil {
+		if err == service.ErrInvalidFileType {
+			response.BadRequest(c, "invalid file type")
+			return
+		}
+		// If resume was created but parsing failed, return success with warning
+		if resume != nil {
+			response.Success(c, gin.H{
+				"resume": resume,
+				"parsed": parsed,
+				"warning": gin.H{
+					"message": "resume created but parsing failed",
+					"error":   err.Error(),
+				},
+			})
+			return
+		}
+		// Other errors (e.g., database errors)
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"resume": resume,
+		"parsed": parsed,
+	})
+}
+
 func parseIntQuery(c *gin.Context, key string, defaultValue int) int {
 	value := c.Query(key)
 	if value == "" {

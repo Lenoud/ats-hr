@@ -69,6 +69,8 @@ type ResumeRepository interface {
 	Update(ctx context.Context, resume *model.Resume) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
+	UpdateStatusIf(ctx context.Context, id uuid.UUID, newStatus string, expectedStatuses []string) (bool, error)
+	UpdateFileURL(ctx context.Context, id uuid.UUID, fileURL string) error
 }
 
 // gormRepository implements ResumeRepository using GORM
@@ -128,14 +130,13 @@ func (r *gormRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Resu
 		Status     string
 		CreatedAt  time.Time
 		UpdatedAt  time.Time
-		DeletedAt  *time.Time
 	}
 
 	var resume dbResume
 	result := r.db.WithContext(ctx).Raw(`
-		SELECT id, name, email, phone, source, file_url, parsed_data, status, created_at, updated_at, deleted_at
+		SELECT id, name, email, phone, source, file_url, parsed_data, status, created_at, updated_at
 		FROM resumes
-		WHERE id = ? AND deleted_at IS NULL
+		WHERE id = ?
 	`, id).Scan(&resume)
 
 	if result.Error != nil {
@@ -184,7 +185,7 @@ func (r *gormRepository) List(ctx context.Context, filter ListFilter) ([]model.R
 	}
 
 	// Build WHERE clause
-	whereClause := "deleted_at IS NULL"
+	whereClause := "1=1"
 	args := []interface{}{}
 
 	if filter.Status != "" {
@@ -261,7 +262,7 @@ func (r *gormRepository) Update(ctx context.Context, resume *model.Resume) error
 
 	query := `UPDATE resumes
 			  SET name = ?, email = ?, phone = ?, source = ?, file_url = ?, parsed_data = ?, status = ?, updated_at = ?
-			  WHERE id = ? AND deleted_at IS NULL`
+			  WHERE id = ?`
 
 	result := r.db.WithContext(ctx).Exec(query,
 		resume.Name,
@@ -284,9 +285,9 @@ func (r *gormRepository) Update(ctx context.Context, resume *model.Resume) error
 	return nil
 }
 
-// Delete soft deletes a resume from the database
+// Delete removes a resume from the database (hard delete)
 func (r *gormRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE resumes SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`
+	query := `DELETE FROM resumes WHERE id = ?`
 	result := r.db.WithContext(ctx).Exec(query, id)
 
 	if result.Error != nil {
@@ -300,8 +301,34 @@ func (r *gormRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 // UpdateStatus updates only the status of a resume
 func (r *gormRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
-	query := `UPDATE resumes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`
+	query := `UPDATE resumes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
 	result := r.db.WithContext(ctx).Exec(query, status, id)
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdateStatusIf updates status only if current status matches one of expected statuses
+// Returns true if update was performed, false if status didn't match
+func (r *gormRepository) UpdateStatusIf(ctx context.Context, id uuid.UUID, newStatus string, expectedStatuses []string) (bool, error) {
+	query := `UPDATE resumes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN ?`
+	result := r.db.WithContext(ctx).Exec(query, newStatus, id, expectedStatuses)
+
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
+// UpdateFileURL updates only the file URL of a resume
+func (r *gormRepository) UpdateFileURL(ctx context.Context, id uuid.UUID, fileURL string) error {
+	query := `UPDATE resumes SET file_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	result := r.db.WithContext(ctx).Exec(query, fileURL, id)
 
 	if result.Error != nil {
 		return result.Error
