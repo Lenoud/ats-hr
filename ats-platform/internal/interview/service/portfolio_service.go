@@ -2,53 +2,95 @@ package service
 
 import (
 	"context"
+	"errors"
+
+	"github.com/google/uuid"
 
 	"github.com/example/ats-platform/internal/interview/model"
 	"github.com/example/ats-platform/internal/interview/repository"
-	"github.com/google/uuid"
 )
 
-// PortfolioService 作品集服务接口
-type PortfolioService interface {
-	CreatePortfolio(ctx context.Context, resumeID uuid.UUID, req *model.CreatePortfolioRequest) (*model.Portfolio, error)
-	GetPortfolio(ctx context.Context, id uuid.UUID) (*model.Portfolio, error)
-	ListPortfoliosByResume(ctx context.Context, resumeID uuid.UUID) ([]*model.Portfolio, error)
-	DeletePortfolio(ctx context.Context, id uuid.UUID) error
+// CreatePortfolioInput defines the input for creating a portfolio
+type CreatePortfolioInput struct {
+	Title    string `json:"title" binding:"required,max=200"`
+	FileURL  string `json:"file_url" binding:"required"`
+	FileType string `json:"file_type" binding:"required"`
 }
 
-// portfolioService 作品集服务实现
+// PortfolioService defines the interface for portfolio business logic
+type PortfolioService interface {
+	Create(ctx context.Context, resumeID uuid.UUID, input CreatePortfolioInput) (*model.Portfolio, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*model.Portfolio, error)
+	ListByResumeID(ctx context.Context, resumeID uuid.UUID) ([]model.Portfolio, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// portfolioService implements PortfolioService
 type portfolioService struct {
 	repo repository.PortfolioRepository
 }
 
-// NewPortfolioService 创建作品集服务
+// NewPortfolioService creates a new PortfolioService instance
 func NewPortfolioService(repo repository.PortfolioRepository) PortfolioService {
 	return &portfolioService{repo: repo}
 }
 
-func (s *portfolioService) CreatePortfolio(ctx context.Context, resumeID uuid.UUID, req *model.CreatePortfolioRequest) (*model.Portfolio, error) {
-	 portfolio := &model.Portfolio{
-        ResumeID:  resumeID,
-        Title:    req.Title,
-        FileURL:  req.FileURL,
-        FileType: model.FileType(req.FileType),
-    }
+// Create creates a new portfolio item
+func (s *portfolioService) Create(ctx context.Context, resumeID uuid.UUID, input CreatePortfolioInput) (*model.Portfolio, error) {
+	// Validate file type
+	if !isValidFileType(input.FileType) {
+		return nil, ErrInvalidFileType
+	}
 
-    if err := s.repo.Create(ctx, portfolio); err != nil {
-        return nil, err
-    }
+	portfolio := &model.Portfolio{
+		ID:       uuid.New(),
+		ResumeID: resumeID,
+		Title:    input.Title,
+		FileURL:  input.FileURL,
+		FileType: input.FileType,
+	}
 
-    return portfolio, nil
+	if err := s.repo.Create(ctx, portfolio); err != nil {
+		return nil, err
+	}
+
+	return portfolio, nil
 }
 
-func (s *portfolioService) GetPortfolio(ctx context.Context, id uuid.UUID) (*model.Portfolio, error) {
-    return s.repo.GetByID(ctx, id)
+// GetByID retrieves a portfolio by its ID
+func (s *portfolioService) GetByID(ctx context.Context, id uuid.UUID) (*model.Portfolio, error) {
+	portfolio, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, errors.New("portfolio not found")
+		}
+		return nil, err
+	}
+	return portfolio, nil
 }
 
-func (s *portfolioService) ListPortfoliosByResume(ctx context.Context, resumeID uuid.UUID) ([]*model.Portfolio, error) {
-    return s.repo.ListByResumeID(ctx, resumeID)
+// ListByResumeID retrieves all portfolios for a resume
+func (s *portfolioService) ListByResumeID(ctx context.Context, resumeID uuid.UUID) ([]model.Portfolio, error) {
+	return s.repo.ListByResumeID(ctx, resumeID)
 }
 
-func (s *portfolioService) DeletePortfolio(ctx context.Context, id uuid.UUID) error {
-    return s.repo.Delete(ctx, id)
+// Delete deletes a portfolio
+func (s *portfolioService) Delete(ctx context.Context, id uuid.UUID) error {
+	err := s.repo.Delete(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return errors.New("portfolio not found")
+		}
+		return err
+	}
+	return nil
+}
+
+func isValidFileType(fileType string) bool {
+	for _, t := range model.ValidFileTypes {
+		if t == fileType {
+			return true
+		}
+	}
+	return false
 }

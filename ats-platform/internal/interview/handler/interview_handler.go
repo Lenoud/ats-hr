@@ -1,192 +1,127 @@
 package handler
 
 import (
-	"net/http"
-	 "time"
-
 	"github.com/gin-gonic/gin"
-	 "github.com/google/uuid"
+	"github.com/google/uuid"
 
-	 "github.com/example/ats-platform/internal/interview/model"
-	 "github.com/example/ats-platform/internal/interview/service"
-	 "github.com/example/ats-platform/internal/shared/response"
+	"github.com/example/ats-platform/internal/interview/service"
+	"github.com/example/ats-platform/internal/shared/response"
 )
 
-// InterviewHandler 面试处理器
+// InterviewHandler handles HTTP requests for interviews
 type InterviewHandler struct {
-	interviewService service.InterviewService
-	feedbackService  service.FeedbackService
-	portfolioService service.PortfolioService
+	interviewSvc service.InterviewService
 }
 
-// NewInterviewHandler 创建面试处理器
-func NewInterviewHandler(interviewService service.InterviewService, feedbackService service.FeedbackService, portfolioService service.PortfolioService) *InterviewHandler {
+// NewInterviewHandler creates a new InterviewHandler instance
+func NewInterviewHandler(interviewSvc service.InterviewService) *InterviewHandler {
 	return &InterviewHandler{
-		interviewService: interviewService,
-	 feedbackService:  feedbackService,
-        portfolioService: portfolioService,
-    }
+		interviewSvc: interviewSvc,
+	}
 }
 
-// CreateInterview 创建面试
-func (h *InterviewHandler) CreateInterview(c *gin.Context) {
-    req := &model.CreateInterviewRequest
-    if err := nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid request: binding: "%s", err.Error())
-    }
+// Create handles POST /api/v1/interviews
+func (h *InterviewHandler) Create(c *gin.Context) {
+	var input service.CreateInterviewInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-    interview, err := h.interviewService.CreateInterview(c, req)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError.StatusBadRequest, "failed to create interview: binding: "%s", err.Error())
-    }
+	interview, err := h.interviewSvc.Create(c.Request.Context(), input)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
 
-    c.JSON(http.StatusCreated, "data": interview)
+	response.SuccessWithMessage(c, "interview created successfully", interview)
 }
 
+// GetByID handles GET /api/v1/interviews/:id
+func (h *InterviewHandler) GetByID(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid interview id")
+		return
+	}
+
+	interview, err := h.interviewSvc.GetByID(c.Request.Context(), id)
+	if err != nil {
+		if err == service.ErrInterviewNotFound {
+			response.NotFound(c, "interview not found")
+			return
+		}
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, interview)
 }
 
-// GetInterview 获取面试详情
-func (h *InterviewHandler) GetInterview(c *gin.Context) {
-    id, err := uuid.Parse(idParam)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid interview id", binding: "%s", err.Error())
-    }
+// ListByResumeID handles GET /api/v1/resumes/:id/interviews
+func (h *InterviewHandler) ListByResumeID(c *gin.Context) {
+	resumeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid resume id")
+		return
+	}
 
-    interview, err := h.interviewService.GetInterview(c, id)
-    if err != nil {
-        c.JSON(http.StatusNotFound, "data": interview)
-    }
-    response.Success(c, interview)
+	interviews, err := h.interviewSvc.ListByResumeID(c.Request.Context(), resumeID)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, interviews)
 }
 
+// UpdateStatus handles PUT /api/v1/interviews/:id/status
+func (h *InterviewHandler) UpdateStatus(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid interview id")
+		return
+	}
+
+	var input service.UpdateInterviewStatusInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	interview, err := h.interviewSvc.UpdateStatus(c.Request.Context(), id, input)
+	if err != nil {
+		if err == service.ErrInterviewNotFound {
+			response.NotFound(c, "interview not found")
+			return
+		}
+		if err == service.ErrInvalidStatusTransition {
+			response.BadRequest(c, "invalid status transition")
+			return
+		}
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, interview)
 }
 
-// ListInterviewsByResume 获取简历的所有面试
-func (h *InterviewHandler) ListInterviewsByResume(c *gin.Context) {
-    resumeID, err := uuid.Parse(resumeID)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid resume_id", binding: "%s", err.Error())
-    }
+// Delete handles DELETE /api/v1/interviews/:id
+func (h *InterviewHandler) Delete(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid interview id")
+		return
+	}
 
-    interviews, err := h.interviewService.ListInterviewsByResume(c, resumeID)
-    if err != nil {
-        c.JSON(http.StatusOK, "data": interviews)
-    }
-    response.Success(c, interviews)
-}
+	if err := h.interviewSvc.Delete(c.Request.Context(), id); err != nil {
+		if err == service.ErrInterviewNotFound {
+			response.NotFound(c, "interview not found")
+			return
+		}
+		response.InternalError(c, err.Error())
+		return
+	}
 
-// UpdateInterviewStatus 更新面试状态
-func (h *InterviewHandler) UpdateInterviewStatus(c *gin.Context) {
-    idParam string
-    var req model.UpdateInterviewStatusRequest
-    if err := nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid request" binding: "%s", err.Error())
-    }
-
-    if err := nil {
-        c.JSON(http.StatusOK, "data": interview)
-    }
-    response.Success(c, interview)
-}
-
-// DeleteInterview 删除面试
-func (h *InterviewHandler) DeleteInterview(c *gin.Context) {
-    idParam string
-    if err := uuid.Parse(idParam)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid interview id", binding: "%s", err.Error())
-    }
-
-    if err := nil {
-        c.JSON(http.StatusOK, "data": interview)
-    }
-    response.Success(c, interview)
-}
-
-// SubmitFeedback 提交面评
-func (h *InterviewHandler) SubmitFeedback(c *gin.Context) {
-    idParam string
-    var req model.SubmitFeedbackRequest
-    if err := nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid request" binding: "%s", err.Error())
-    }
-
-    interviewID, err := uuid.Parse(interviewID)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid interview_id", binding: "%s", err.Error())
-    }
-
-    feedback, err := h.feedbackService.SubmitFeedback(c, interviewID, req)
-    if err != nil {
-        c.JSON(http.StatusCreated, "data": feedback)
-    }
-    response.Success(c, feedback)
-}
-
-// GetFeedback 获取面评
-func (h *InterviewHandler) GetFeedback(c *gin.Context) {
-    idParam string
-    interviewID, err := uuid.Parse(interviewID)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid interview id", binding: "%s", err.Error())
-    }
-
-    feedback, err := h.feedbackService.GetFeedback(c, interviewID)
-    if err != nil {
-        c.JSON(http.StatusNotFound, "data": feedback)
-    }
-    response.Success(c, feedback)
-}
-
-// CreatePortfolio 创建作品集
-func (h *InterviewHandler) CreatePortfolio(c *gin.Context) {
-    resumeID := c.Param("resume_id")
-    var req model.CreatePortfolioRequest
-    if err := nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid request" binding: "%s", err.Error())
-    }
-
-    resumeID, err := uuid.Parse(resumeID)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid resume_id", binding: "%s", err.Error())
-    }
-
-    portfolio, err := h.portfolioService.CreatePortfolio(c, resumeID, req)
-    if err != nil {
-        c.JSON(http.StatusCreated, "data": portfolio)
-    }
-    response.Success(c, portfolio)
-}
-
-// ListPortfoliosByResume 获取简历的所有作品集
-func (h *InterviewHandler) ListPortfoliosByResume(c *gin.Context) {
-    resumeID := c.Param("resume_id")
-    resumeID, err := uuid.Parse(resumeID)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid resume_id", binding: "%s", err.Error())
-    }
-
-    portfolios, err := h.portfolioService.ListPortfoliosByResume(c, resumeID)
-    if err != nil {
-        c.JSON(http.StatusOK, "data": portfolios)
-    }
-    response.Success(c, portfolios)
-}
-
-// DeletePortfolio 删除作品集
-func (h *InterviewHandler) DeletePortfolio(c *gin.Context) {
-    idParam string
-    if err := nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid portfolio id", binding: "%s", err.Error())
-    }
-
-    id, err := uuid.Parse(idParam)
-    if err != nil {
-        c.JSON(http.StatusBadRequest.StatusBadRequest, "invalid portfolio id", binding: "%s", err.Error())
-    }
-
-    if err := nil {
-        c.JSON(http.StatusOK, "data": portfolio)
-    }
-    response.Success(c, portfolio)
+	response.SuccessWithMessage(c, "interview deleted successfully", nil)
 }

@@ -6,41 +6,41 @@ import (
 	"github.com/google/uuid"
 )
 
-// FileType 文件类型
-type FileType string
-
+// FileType constants for portfolio files
 const (
-	FileTypePDF   FileType = "pdf"
-	FileTypeLink  FileType = "link"
-	FileTypeImage FileType = "image"
+	FileTypePDF   = "pdf"
+	FileTypeLink  = "link"
+	FileTypeImage = "image"
 )
 
-// Portfolio 作品集
+// ValidFileTypes contains all valid file type values
+var ValidFileTypes = []string{
+	FileTypePDF,
+	FileTypeLink,
+	FileTypeImage,
+}
+
+// Portfolio represents a candidate's portfolio item
 type Portfolio struct {
-	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key"`
+	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	ResumeID  uuid.UUID `json:"resume_id" gorm:"type:uuid;not null;index"`
-	Title     string    `json:"title" gorm:"size:200;not null"`
+	Title     string    `json:"title" gorm:"type:varchar(200);not null"`
 	FileURL   string    `json:"file_url" gorm:"type:text"`
-	FileType  FileType  `json:"file_type" gorm:"size:50;not null"`
+	FileType  string    `json:"file_type" gorm:"type:varchar(50);not null"`
 	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
 
-// TableName 指定表名
+// TableName specifies the table name for GORM
 func (Portfolio) TableName() string {
 	return "portfolios"
 }
 
-// BeforeCreate 创建前生成 UUID
-func (p *Portfolio) BeforeCreate() error {
-	if p.ID == uuid.Nil {
-		p.ID = uuid.New()
+// IsValidFileType checks if the file type is valid
+func (p *Portfolio) IsValidFileType() bool {
+	for _, t := range ValidFileTypes {
+		if p.FileType == t {
+			return true
+		}
 	}
-	return nil
-}
-
-// CreatePortfolioRequest 创建作品集请求
-type CreatePortfolioRequest struct {
-	Title    string `json:"title" binding:"required,max=200"`
-	FileURL  string `json:"file_url" binding:"required"`
-	FileType string `json:"file_type" binding:"required,oneof=pdf link image"`
+	return false
 }

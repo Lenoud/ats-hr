@@ -139,3 +139,85 @@ API 端点:
 3. 面评提交和查询功能正常
 4. 作品集上传、查询、删除功能正常
 5. 提供前端测试界面
+
+---
+
+## 招聘流程设计 (待实现)
+
+### 整体流程状态
+
+候选人级别的招聘流程状态（建议添加到 `resumes` 表或新建 `hiring_processes` 表）：
+
+```
+┌─────────────┐
+│   pending   │  ← 简历初筛阶段
+└──────┬──────┘
+       │
+       ▼ pass
+┌─────────────┐
+│  screening  │  ← 二次筛选/技术评估
+└──────┬──────┘
+       │
+       ▼ pass
+┌─────────────┐
+│ interviewing│  ← 面试流程中 (可多轮)
+└──────┬──────┘
+       │
+       ├─────────────────┬─────────────────┐
+       ▼                 ▼                 ▼
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│   offered   │   │   rejected   │   │  withdrawn  │
+└─────────────┘   └─────────────┘   └─────────────┘
+   (发offer)        (淘汰)          (候选人撤回)
+```
+
+### 状态转换规则
+
+| From | To | Trigger |
+|------|-----|---------|
+| `pending` | `screening` | 简历通过初筛 |
+| `pending` | `rejected` | 简历不符合要求 |
+| `screening` | `interviewing` | 通过技术评估 |
+| `screening` | `rejected` | 技术评估不通过 |
+| `interviewing` | `offered` | 所有面试通过，发放offer |
+| `interviewing` | `rejected` | 面试未通过 |
+| `interviewing` | `interviewing` | 进入下一轮面试 |
+| `offered` | `hired` | 候选人接受offer |
+| `offered` | `rejected` | 候选人拒绝offer |
+| * | `withdrawn` | 候选人主动撤回 |
+
+### 面评推荐与流程推进
+
+| Recommendation | Action |
+|----------------|--------|
+| `strong_yes` | 自动推进到下一轮 |
+| `yes` | 需要下一轮确认，或推进 |
+| `no` | 终止流程 (rejected) |
+| `strong_no` | 立即终止流程 (rejected) |
+
+### 数据模型变更
+
+```go
+// 新增字段到 resumes 表或新建 hiring_processes 表
+type HiringProcess struct {
+    ID           uuid.UUID
+    ResumeID     uuid.UUID
+    Status       string    // pending/screening/interviewing/offered/hired/rejected/withdrawn
+    CurrentRound int        // 当前面试轮次 (0=筛选中)
+    TotalRounds  int        // 计划面试轮次
+    RejectReason string    // 淘汰原因
+    OfferAmount  float64   // offer金额
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
+}
+```
+
+### 新增 API 端点
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| GET | `/api/v1/resumes/:id/process` | 获取招聘流程状态 |
+| POST | `/api/v1/resumes/:id/process/advance` | 推进到下一阶段 |
+| POST | `/api/v1/resumes/:id/process/reject` | 淘汰候选人 |
+| POST | `/api/v1/resumes/:id/process/offer` | 发放offer |
+| POST | `/api/v1/resumes/:id/process/hire` | 确认入职 |

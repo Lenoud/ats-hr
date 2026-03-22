@@ -4,24 +4,32 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
+
 	"github.com/example/ats-platform/internal/interview/model"
 	"github.com/example/ats-platform/internal/interview/repository"
-	"github.com/google/uuid"
 )
 
-// FeedbackService 面评服务接口
+// SubmitFeedbackInput defines the input for submitting feedback
+type SubmitFeedbackInput struct {
+	Rating         int    `json:"rating" binding:"required,min=1,max=5"`
+	Content        string `json:"content"`
+	Recommendation string `json:"recommendation" binding:"required"`
+}
+
+// FeedbackService defines the interface for feedback business logic
 type FeedbackService interface {
-	SubmitFeedback(ctx context.Context, interviewID uuid.UUID, req *model.SubmitFeedbackRequest) (*model.Feedback, error)
-	GetFeedback(ctx context.Context, interviewID uuid.UUID) (*model.Feedback, error)
+	Submit(ctx context.Context, interviewID uuid.UUID, input SubmitFeedbackInput) (*model.Feedback, error)
+	GetByInterviewID(ctx context.Context, interviewID uuid.UUID) (*model.Feedback, error)
 }
 
-// feedbackService 面评服务实现
+// feedbackService implements FeedbackService
 type feedbackService struct {
-	feedbackRepo   repository.FeedbackRepository
-	interviewRepo  repository.InterviewRepository
+	feedbackRepo  repository.FeedbackRepository
+	interviewRepo repository.InterviewRepository
 }
 
-// NewFeedbackService 创建面评服务
+// NewFeedbackService creates a new FeedbackService instance
 func NewFeedbackService(feedbackRepo repository.FeedbackRepository, interviewRepo repository.InterviewRepository) FeedbackService {
 	return &feedbackService{
 		feedbackRepo:  feedbackRepo,
@@ -29,24 +37,35 @@ func NewFeedbackService(feedbackRepo repository.FeedbackRepository, interviewRep
 	}
 }
 
-func (s *feedbackService) SubmitFeedback(ctx context.Context, interviewID uuid.UUID, req *model.SubmitFeedbackRequest) (*model.Feedback, error) {
-	// 检查面试是否存在
-	interview, err := s.interviewRepo.GetByID(ctx, interviewID)
+// Submit creates feedback for an interview
+func (s *feedbackService) Submit(ctx context.Context, interviewID uuid.UUID, input SubmitFeedbackInput) (*model.Feedback, error) {
+	// Check if interview exists
+	_, err := s.interviewRepo.GetByID(ctx, interviewID)
 	if err != nil {
-		return nil, errors.New("interview not found")
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrInterviewNotFound
+		}
+		return nil, err
 	}
 
-	// 检查是否已有面评
+	// Check if feedback already exists
 	existing, _ := s.feedbackRepo.GetByInterviewID(ctx, interviewID)
 	if existing != nil {
-		return nil, errors.New("feedback already exists for this interview")
+		return nil, ErrFeedbackAlreadyExists
+	}
+
+	// Validate recommendation
+	recommendation := input.Recommendation
+	if !isValidRecommendation(recommendation) {
+		return nil, errors.New("invalid recommendation value")
 	}
 
 	feedback := &model.Feedback{
-		InterviewID:    interview.ID,
-		Rating:         req.Rating,
-		Content:        req.Content,
-		Recommendation: model.Recommendation(req.Recommendation),
+		ID:             uuid.New(),
+		InterviewID:    interviewID,
+		Rating:         input.Rating,
+		Content:        input.Content,
+		Recommendation: recommendation,
 	}
 
 	if err := s.feedbackRepo.Create(ctx, feedback); err != nil {
@@ -56,6 +75,23 @@ func (s *feedbackService) SubmitFeedback(ctx context.Context, interviewID uuid.U
 	return feedback, nil
 }
 
-func (s *feedbackService) GetFeedback(ctx context.Context, interviewID uuid.UUID) (*model.Feedback, error) {
-	return s.feedbackRepo.GetByInterviewID(ctx, interviewID)
+// GetByInterviewID retrieves feedback by interview ID
+func (s *feedbackService) GetByInterviewID(ctx context.Context, interviewID uuid.UUID) (*model.Feedback, error) {
+	feedback, err := s.feedbackRepo.GetByInterviewID(ctx, interviewID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrFeedbackNotFound
+		}
+		return nil, err
+	}
+	return feedback, nil
+}
+
+func isValidRecommendation(r string) bool {
+	switch r {
+	case model.RecommendationStrongYes, model.RecommendationYes, model.RecommendationNo, model.RecommendationStrongNo:
+		return true
+	default:
+		return false
+	}
 }

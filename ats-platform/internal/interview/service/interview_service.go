@@ -3,43 +3,69 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/example/ats-platform/internal/interview/model"
 	"github.com/example/ats-platform/internal/interview/repository"
-	"github.com/google/uuid"
 )
 
-// InterviewService 面试服务接口
-type InterviewService interface {
-	CreateInterview(ctx context.Context, req *model.CreateInterviewRequest) (*model.Interview, error)
-	GetInterview(ctx context.Context, id uuid.UUID) (*model.Interview, error)
-	ListInterviewsByResume(ctx context.Context, resumeID uuid.UUID) ([]*model.Interview, error)
-	UpdateInterviewStatus(ctx context.Context, id uuid.UUID, status string) error
-	DeleteInterview(ctx context.Context, id uuid.UUID) error
+var (
+	ErrInterviewNotFound      = errors.New("interview not found")
+	ErrInvalidStatus          = errors.New("invalid interview status")
+	ErrInvalidStatusTransition = errors.New("invalid status transition")
+	ErrFeedbackNotFound       = errors.New("feedback not found")
+	ErrFeedbackAlreadyExists  = errors.New("feedback already exists for this interview")
+	ErrInvalidFileType        = errors.New("invalid file type")
+)
+
+// CreateInterviewInput defines the input for creating an interview
+type CreateInterviewInput struct {
+	ResumeID    string    `json:"resume_id" binding:"required"`
+	Round       int       `json:"round" binding:"required,min=1"`
+	Interviewer string    `json:"interviewer" binding:"required"`
+	ScheduledAt time.Time `json:"scheduled_at" binding:"required"`
 }
 
-// interviewService 面试服务实现
+// UpdateInterviewStatusInput defines the input for updating interview status
+type UpdateInterviewStatusInput struct {
+	Status string `json:"status" binding:"required"`
+}
+
+// InterviewService defines the interface for interview business logic
+type InterviewService interface {
+	Create(ctx context.Context, input CreateInterviewInput) (*model.Interview, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*model.Interview, error)
+	ListByResumeID(ctx context.Context, resumeID uuid.UUID) ([]model.Interview, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, input UpdateInterviewStatusInput) (*model.Interview, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// interviewService implements InterviewService
 type interviewService struct {
 	repo repository.InterviewRepository
 }
 
-// NewInterviewService 创建面试服务
+// NewInterviewService creates a new InterviewService instance
 func NewInterviewService(repo repository.InterviewRepository) InterviewService {
 	return &interviewService{repo: repo}
 }
 
-func (s *interviewService) CreateInterview(ctx context.Context, req *model.CreateInterviewRequest) (*model.Interview, error) {
-	resumeID, err := uuid.Parse(req.ResumeID)
+// Create creates a new interview with default status
+func (s *interviewService) Create(ctx context.Context, input CreateInterviewInput) (*model.Interview, error) {
+	resumeID, err := uuid.Parse(input.ResumeID)
 	if err != nil {
 		return nil, errors.New("invalid resume_id format")
 	}
 
 	interview := &model.Interview{
+		ID:          uuid.New(),
 		ResumeID:    resumeID,
-		Round:       req.Round,
-		Interviewer: req.Interviewer,
-		ScheduledAt: req.ScheduledAt,
-			Status:      model.InterviewStatus(model.InterviewStatusScheduled),
+		Round:       input.Round,
+		Interviewer: input.Interviewer,
+		ScheduledAt: input.ScheduledAt,
+		Status:      model.InterviewStatusScheduled,
 	}
 
 	if err := s.repo.Create(ctx, interview); err != nil {
@@ -49,28 +75,61 @@ func (s *interviewService) CreateInterview(ctx context.Context, req *model.Creat
 	return interview, nil
 }
 
-func (s *interviewService) GetInterview(ctx context.Context, id uuid.UUID) (*model.Interview, error) {
-	return s.repo.GetByID(ctx, id)
+// GetByID retrieves an interview by its ID
+func (s *interviewService) GetByID(ctx context.Context, id uuid.UUID) (*model.Interview, error) {
+	interview, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrInterviewNotFound
+		}
+		return nil, err
+	}
+	return interview, nil
 }
 
-func (s *interviewService) ListInterviewsByResume(ctx context.Context, resumeID uuid.UUID) ([]*model.Interview, error) {
+// ListByResumeID retrieves all interviews for a resume
+func (s *interviewService) ListByResumeID(ctx context.Context, resumeID uuid.UUID) ([]model.Interview, error) {
 	return s.repo.ListByResumeID(ctx, resumeID)
 }
 
-func (s *interviewService) UpdateInterviewStatus(ctx context.Context, id uuid.UUID, status string) error {
-	// 验证状态值
-	validStatuses := map[string]bool{
-		string(model.InterviewStatusScheduled): true,
-		string(model.InterviewStatusCompleted): true,
-		string(model.InterviewStatusCancelled): true,
-	}
-	if !validStatuses[status] {
-		return errors.New("invalid status value")
+// UpdateStatus updates the status of an interview with validation
+func (s *interviewService) UpdateStatus(ctx context.Context, id uuid.UUID, input UpdateInterviewStatusInput) (*model.Interview, error) {
+	interview, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrInterviewNotFound
+		}
+		return nil, err
 	}
 
-	return s.repo.UpdateStatus(ctx, id, status)
+	// Validate status transition
+	newStatus := input.Status
+	if !interview.CanTransitionTo(newStatus) {
+		return nil, ErrInvalidStatusTransition
+	}
+
+	if err := s.repo.UpdateStatus(ctx, id, input.Status); err != nil {
+		return nil, err
+	}
+
+	// Re-fetch to get updated timestamp
+	updatedInterview, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		interview.Status = newStatus
+		return interview, nil
+	}
+
+	return updatedInterview, nil
 }
 
-func (s *interviewService) DeleteInterview(ctx context.Context, id uuid.UUID) error {
-	return s.repo.Delete(ctx, id)
+// Delete deletes an interview
+func (s *interviewService) Delete(ctx context.Context, id uuid.UUID) error {
+	err := s.repo.Delete(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrInterviewNotFound
+		}
+		return err
+	}
+	return nil
 }
