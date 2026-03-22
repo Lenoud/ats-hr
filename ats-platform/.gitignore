@@ -1,4 +1,4 @@
-# Binaries
+# Binaries (编译产物)
 *.exe
 *.exe~
 *.dll
@@ -7,9 +7,20 @@
 bin/
 dist/
 
-# Test coverage
+# Service binaries (服务二进制文件)
+resume-service
+interview-service
+search-service
+gateway
+cmd/resume-service/resume-service
+cmd/interview-service/interview-service
+cmd/search-service/search-service
+cmd/gateway/gateway
+
+# Test coverage (测试覆盖率)
 *.out
 coverage.html
+coverage.txt
 
 # IDE
 .idea/
@@ -17,12 +28,14 @@ coverage.html
 *.swp
 *.swo
 
-# Environment
+# Environment (环境配置)
 .env
 .env.local
+.env.*.local
 *.local.yaml
+configs/config.yaml
 
-# Logs
+# Logs (日志)
 logs/
 *.log
 
@@ -33,11 +46,14 @@ Thumbs.db
 # Dependencies
 vendor/
 
-# Generated
-internal/shared/pb/search-service
-search-service
-interview-service
-gateway
-gateway
-interview-service
-search-service
+# Generated protobuf (保留生成的代码)
+# internal/shared/pb/
+
+# Temporary files (临时文件)
+*.tmp
+*.temp
+screenshot.png
+test-report.md
+
+# Docker (可选，本地开发)
+# deployments/.env
