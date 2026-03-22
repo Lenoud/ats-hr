@@ -4,12 +4,16 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"net"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
+	grpcHandler "github.com/example/ats-platform/internal/interview/grpc"
 	"github.com/example/ats-platform/internal/interview/handler"
 	"github.com/example/ats-platform/internal/interview/repository"
 	"github.com/example/ats-platform/internal/interview/service"
@@ -17,6 +21,7 @@ import (
 	"github.com/example/ats-platform/internal/shared/events"
 	"github.com/example/ats-platform/internal/shared/logger"
 	"github.com/example/ats-platform/internal/shared/middleware"
+	"github.com/example/ats-platform/internal/shared/pb/interview"
 )
 
 //go:embed static/index.html
@@ -26,6 +31,8 @@ var indexHTML string
 type Config struct {
 	HTTPHost    string
 	HTTPPort    string
+	GRPCHost    string
+	GRPCPort    string
 	DBHost      string
 	DBPort      string
 	DBUser      string
@@ -37,6 +44,8 @@ type Config struct {
 
 func loadConfig() *Config {
 	return &Config{
+		GRPCHost:    getEnv("GRPC_HOST", "0.0.0.0"),
+		GRPCPort:    getEnv("GRPC_PORT", "9091"),
 		HTTPHost:    getEnv("HTTP_HOST", "0.0.0.0"),
 		HTTPPort:    getEnv("HTTP_PORT", "8082"),
 		DBHost:      getEnv("DB_HOST", "192.168.250.233"),
@@ -114,6 +123,25 @@ func main() {
 	feedbackHandler := handler.NewFeedbackHandler(feedbackSvc)
 	portfolioHandler := handler.NewPortfolioHandler(portfolioSvc)
 
+	// Start gRPC server
+	go func() {
+		grpcAddr := cfg.GRPCHost + ":" + cfg.GRPCPort
+		lis, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			fmt.Printf("❌ gRPC listen failed: %v\n", err)
+			return
+		}
+		grpcSrv := grpc.NewServer()
+		interview.RegisterInterviewServiceServer(grpcSrv, grpcHandler.NewInterviewServiceServer(interviewSvc))
+		interview.RegisterFeedbackServiceServer(grpcSrv, grpcHandler.NewFeedbackServiceServer(feedbackSvc))
+		interview.RegisterPortfolioServiceServer(grpcSrv, grpcHandler.NewPortfolioServiceServer(portfolioSvc))
+		reflection.Register(grpcSrv)
+		fmt.Printf("🚀 gRPC Server running on %s\n", grpcAddr)
+		if err := grpcSrv.Serve(lis); err != nil {
+			fmt.Printf("gRPC server error: %v\n", err)
+		}
+	}()
+
 	// Setup Gin router
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -181,6 +209,7 @@ func main() {
 	// Start HTTP server
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
 	fmt.Printf("🚀 HTTP Server running on http://%s\n", addr)
+	fmt.Printf("   gRPC: %s:%s\n", cfg.GRPCHost, cfg.GRPCPort)
 	fmt.Printf("   Database: %s@%s:%s/%s\n", cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	fmt.Printf("   Redis: %s (stream: %s)\n", cfg.RedisAddr, cfg.RedisStream)
 	if publisher != nil {
