@@ -8,14 +8,10 @@ bin/
 dist/
 
 # Service binaries (服务二进制文件)
-resume-service
-interview-service
-search-service
-gateway
-cmd/resume-service/resume-service
-cmd/interview-service/interview-service
-cmd/search-service/search-service
-cmd/gateway/gateway
+/cmd/resume-service/resume-service
+/cmd/interview-service/interview-service
+/cmd/search-service/search-service
+/cmd/gateway/gateway
 
 # Test coverage (测试覆盖率)
 *.out

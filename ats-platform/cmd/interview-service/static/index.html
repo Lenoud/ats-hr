@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS 面试管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #1976d2; margin-bottom: 10px; }
+        h2 { color: #333; margin: 20px 0 10px; border-bottom: 2px solid #1976d2; padding-bottom: 5px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        input:focus, select:focus, textarea:focus { border-color: #1976d2; outline: none; }
+        button { padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px 5px 5px 0; font-size: 14px; transition: background 0.3s; }
+        button:hover { background: #1565c0; }
+        button.danger { background: #d32f2f; }
+        button.danger:hover { background: #c62828; }
+        button.success { background: #388e3c; }
+        button.success:hover { background: #2e7d32; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px 12px; border: 1px solid #e0e0e0; text-align: left; }
+        th { background: #f5f5f5; font-weight: bold; color: #333; }
+        tr:hover { background: #fafafa; }
+        .status-scheduled { color: #1976d2; font-weight: bold; }
+        .status-completed { color: #388e3c; font-weight: bold; }
+        .status-cancelled { color: #d32f2f; font-weight: bold; }
+        .section { margin-bottom: 30px; padding: 15px; background: #fafafa; border-radius: 4px; border: 1px solid #eee; }
+        .api-result { background: #e8f5e9; padding: 10px; margin-top: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; border-left: 4px solid #4caf50; }
+        .error-result { background: #ffebee; border-left-color: #f44336; }
+        .hint { color: #666; font-size: 12px; margin-top: 3px; }
+        /* Toast notification styles */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { padding: 12px 20px; margin-bottom: 10px; border-radius: 4px; color: white; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 8px; }
+        .toast.success { background: #4caf50; }
+        .toast.error { background: #f44336; }
+        .toast.info { background: #2196f3; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 ATS 面试管理系统</h1>
+        <p>管理面试安排、面评和作品集</p>
+
+        <div class="section">
+            <h2>📅 创建面试</h2>
+            <div class="form-group">
+                <label>简历ID:</label>
+                <input type="text" id="resumeId" placeholder="输入简历UUID">
+            </div>
+            <div class="form-group">
+                <label>面试轮次:</label>
+                <select id="round">
+                    <option value="1">第一轮</option>
+                    <option value="2">第二轮</option>
+                    <option value="3">第三轮</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>面试官:</label>
+                <input type="text" id="interviewer" placeholder="面试官姓名">
+            </div>
+            <div class="form-group">
+                <label>预约时间:</label>
+                <input type="datetime-local" id="scheduledAt">
+            </div>
+            <button onclick="createInterview()">创建面试</button>
+        </div>
+
+        <div class="section">
+            <h2>📋 查询面试</h2>
+            <div class="form-group">
+                <label>简历ID:</label>
+                <input type="text" id="searchResumeId" placeholder="输入简历UUID">
+            </div>
+            <button onclick="listInterviews()">查询面试</button>
+            <table id="interviewTable">
+                <thead>
+                    <tr><th>ID</th><th>轮次</th><th>面试官</th><th>预约时间</th><th>状态</th><th>操作</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>⭐ 提交面评</h2>
+            <div class="form-group">
+                <label>面试ID:</label>
+                <input type="text" id="feedbackInterviewId" placeholder="点击上方面试列表中的面评按钮">
+                <p class="hint">点击上方面试列表中的"面评"按钮自动填充</p>
+            </div>
+            <div class="form-group">
+                <label>评分 (1-5):</label>
+                <select id="rating">
+                    <option value="5">5 - 优秀</option>
+                    <option value="4">4 - 良好</option>
+                    <option value="3">3 - 一般</option>
+                    <option value="2">2 - 较差</option>
+                    <option value="1">1 - 不合格</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>推荐意见:</label>
+                <select id="recommendation">
+                    <option value="strong_yes">强烈推荐</option>
+                    <option value="yes">推荐</option>
+                    <option value="no">不推荐</option>
+                    <option value="strong_no">强烈不推荐</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>面评内容:</label>
+                <textarea id="feedbackContent" rows="3" placeholder="详细面评内容"></textarea>
+            </div>
+            <button onclick="submitFeedback()">提交面评</button>
+        </div>
+
+        <div class="section">
+            <h2>📁 作品集</h2>
+            <div class="form-group">
+                <label>简历ID:</label>
+                <input type="text" id="portfolioResumeId" placeholder="输入简历UUID">
+            </div>
+            <div class="form-group">
+                <label>标题:</label>
+                <input type="text" id="portfolioTitle" placeholder="作品标题">
+            </div>
+            <div class="form-group">
+                <label>类型:</label>
+                <select id="portfolioType">
+                    <option value="pdf">PDF</option>
+                    <option value="link">链接</option>
+                    <option value="image">图片</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>URL:</label>
+                <input type="text" id="portfolioUrl" placeholder="文件或链接URL">
+            </div>
+            <button onclick="createPortfolio()">添加作品集</button>
+            <button onclick="listPortfolios()">查看作品集</button>
+            <table id="portfolioTable">
+                <thead>
+                    <tr><th>ID</th><th>标题</th><th>类型</th><th>URL</th><th>操作</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="result" class="api-result" style="display:none;"></div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // Toast notification system
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+            toast.innerHTML = '<span>' + icon + '</span><span>' + message + '</span>';
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function showResult(data, isError = false) {
+            const el = document.getElementById('result');
+            el.style.display = 'block';
+            el.className = isError ? 'api-result error-result' : 'api-result';
+            el.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function handleResponse(d, successMsg) {
+            if (d.code === 0) {
+                showToast(successMsg, 'success');
+            } else {
+                showToast(d.message || '操作失败', 'error');
+            }
+            showResult(d, d.code !== 0);
+            return d.code === 0;
+        }
+
+        function createInterview() {
+            const scheduledAtVal = document.getElementById('scheduledAt').value;
+            const data = {
+                resume_id: document.getElementById('resumeId').value,
+                round: parseInt(document.getElementById('round').value),
+                interviewer: document.getElementById('interviewer').value,
+                scheduled_at: scheduledAtVal ? scheduledAtVal + ':00+08:00' : new Date().toISOString()
+            };
+            fetch('/api/v1/interviews', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (handleResponse(d, '面试创建成功')) {
+                    document.getElementById('searchResumeId').value = data.resume_id;
+                    listInterviews();
+                }
+            })
+            .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        function listInterviews() {
+            const resumeId = document.getElementById('searchResumeId').value;
+            if (!resumeId) {
+                showToast('请输入简历ID', 'error');
+                showResult({error: '请输入简历ID'}, true);
+                return;
+            }
+            fetch('/api/v1/resumes/' + resumeId + '/interviews')
+                .then(r => r.json())
+            .then(d => {
+                showResult(d);
+                if (d.code !== 0) {
+                    showToast(d.message || '查询失败', 'error');
+                }
+                const tbody = document.querySelector('#interviewTable tbody');
+                tbody.innerHTML = '';
+                (d.data || []).forEach(i => {
+                    const statusClass = 'status-' + i.status;
+                    tbody.innerHTML += '<tr>' +
+                        '<td>' + i.id.substring(0, 8) + '...</td>' +
+                        '<td>' + i.round + '</td>' +
+                        '<td>' + i.interviewer + '</td>' +
+                        '<td>' + new Date(i.scheduled_at).toLocaleString() + '</td>' +
+                        '<td class="' + statusClass + '">' + i.status + '</td>' +
+                        '<td>' +
+                            '<button class="success" onclick="completeInterview(\'' + i.id + '\')">完成</button> ' +
+                            '<button class="danger" onclick="cancelInterview(\'' + i.id + '\')">取消</button> ' +
+                            '<button onclick="showFeedbackForm(\'' + i.id + '\')">面评</button> ' +
+                        '</td>' +
+                        '</tr>';
+                    });
+                })
+                .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        function completeInterview(id) {
+            fetch('/api/v1/interviews/' + id + '/status', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: 'completed'})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (handleResponse(d, '面试已标记为完成')) {
+                    listInterviews();
+                }
+            })
+            .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        function cancelInterview(id) {
+            fetch('/api/v1/interviews/' + id + '/status', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: 'cancelled'})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (handleResponse(d, '面试已取消')) {
+                    listInterviews();
+                }
+            })
+            .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        function showFeedbackForm(interviewId) {
+            document.getElementById('feedbackInterviewId').value = interviewId;
+            document.getElementById('feedbackInterviewId').scrollIntoView({behavior: 'smooth'});
+        }
+
+        function submitFeedback() {
+            const interviewId = document.getElementById('feedbackInterviewId').value;
+            if (!interviewId) {
+                showToast('请先选择面试', 'error');
+                showResult({error: '请先选择面试'}, true);
+                return;
+            }
+            const data = {
+                rating: parseInt(document.getElementById('rating').value),
+                content: document.getElementById('feedbackContent').value,
+                recommendation: document.getElementById('recommendation').value
+            };
+            fetch('/api/v1/interviews/' + interviewId + '/feedback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(d => { handleResponse(d, '面评提交成功'); })
+            .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        function createPortfolio() {
+            const resumeId = document.getElementById('portfolioResumeId').value;
+            if (!resumeId) {
+                showToast('请输入简历ID', 'error');
+                showResult({error: '请输入简历ID'}, true);
+                return;
+            }
+            const data = {
+                title: document.getElementById('portfolioTitle').value,
+                file_url: document.getElementById('portfolioUrl').value,
+                file_type: document.getElementById('portfolioType').value
+            };
+            fetch('/api/v1/resumes/' + resumeId + '/portfolios', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (handleResponse(d, '作品集添加成功')) {
+                    listPortfolios();
+                }
+            })
+            .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        function listPortfolios() {
+            const resumeId = document.getElementById('portfolioResumeId').value;
+            if (!resumeId) {
+                showToast('请输入简历ID', 'error');
+                showResult({error: '请输入简历ID'}, true);
+                return;
+            }
+            fetch('/api/v1/resumes/' + resumeId + '/portfolios')
+                .then(r => r.json())
+            .then(d => {
+                showResult(d);
+                if (d.code !== 0) {
+                    showToast(d.message || '查询失败', 'error');
+                }
+                const tbody = document.querySelector('#portfolioTable tbody');
+                tbody.innerHTML = '';
+                (d.data || []).forEach(p => {
+                    tbody.innerHTML += '<tr>' +
+                        '<td>' + p.id.substring(0, 8) + '...</td>' +
+                        '<td>' + p.title + '</td>' +
+                        '<td>' + p.file_type + '</td>' +
+                        '<td><a href="' + p.file_url + '" target="_blank">查看</a></td>' +
+                        '<td><button class="danger" onclick="deletePortfolio(\'' + p.id + '\')">删除</button></td>' +
+                        '</tr>';
+                    });
+                })
+                .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        function deletePortfolio(id) {
+            fetch('/api/v1/portfolios/' + id, {method: 'DELETE'})
+                .then(r => r.json())
+            .then(d => {
+                if (handleResponse(d, '作品集已删除')) {
+                    listPortfolios();
+                }
+            })
+            .catch(e => { showToast(e.message, 'error'); showResult({error: e.message}, true); });
+        }
+
+        // Initialize datetime input with current time
+        document.getElementById('scheduledAt').value = new Date().toISOString().slice(0, 16);
+    </script>
+</body>
+</html>
