@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS 简历管理</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #1976d3; margin-bottom: 10px; }
+        h2 { color: #333; margin: 20px 0 10px; border-bottom: 2px solid #1976d3; padding-bottom: 5px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { padding: 10px 20px; background: #1976d3; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px 5px 5px 0; }
+        button:hover { background: #1565c0; }
+        button.danger { background: #d32f2f; }
+        button.success { background: #388e3c; }
+        button.warning { background: #ff9800; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f5f5f5; font-weight: bold; }
+        .status-pending { color: #ff9800; font-weight: bold; }
+        .status-parsed { color: #388e3c; font-weight: bold; }
+        .status-failed { color: #d32f2f; font-weight: bold; }
+        .stats { background: #e3f2fd; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
+        .highlight-box { background: #f3e5f5; padding: 15px; border-radius: 4px; border-left: 4px solid #7b1fa2; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 1% auto; padding: 20px; border-radius: 8px; width: 95%; max-width: 1400px; height: 95vh; overflow: hidden; position: relative; }
+        .modal-close { position: absolute; right: 15px; top: 10px; font-size: 28px; cursor: pointer; color: #666; z-index: 10; }
+        .modal-close:hover { color: #000; }
+        .modal-body { display: flex; height: calc(100% - 40px); margin-top: 30px; }
+        .pdf-viewer { flex: 1; background: #333; display: flex; flex-direction: column; align-items: center; margin-right: 10px; border-radius: 4px; overflow: auto; }
+        #pdfCanvas { margin-top: 10px; background: white; max-width: 100%; }
+        .pdf-controls { background: #444; padding: 10px; text-align: center; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .pdf-controls button { background: #666; margin: 0; padding: 5px 15px; }
+        .pdf-controls button:hover { background: #888; }
+        .pdf-controls span { color: white; margin: 0; }
+        .pdf-controls input[type="number"] { border: 1px solid #666; border-radius: 3px; background: #555; color: white; }
+        .pdf-controls input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+        .detail-panel { width: 350px; overflow-y: auto; padding: 15px; background: #fafafa; border-left: 1px solid #ddd; }
+        .parsed-section { margin: 10px 0; padding: 10px; background: white; border-radius: 4px; border: 1px solid #eee; }
+        .parsed-section h4 { color: #1976d3; margin-bottom: 8px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ATS 简历管理</h1>
+        <p style="color: #666; margin-bottom: 20px;">简历上传、解析和管理</p>
+
+        <div class="highlight-box">
+            <h2>📤 上传并解析简历</h2>
+            <form id="uploadForm" style="display:flex; gap:10px; align-items:flex-end;">
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                    <label>简历文件 (PDF/DOCX):</label>
+                    <input type="file" id="uploadFile" accept=".pdf,.docx,.doc" required>
+                </div>
+                <div class="form-group" style="width:150px; margin-bottom:0;">
+                    <label>来源:</label>
+                    <select id="uploadSource">
+                        <option value="upload">本地上传</option>
+                        <option value="Boss直聘">Boss直聘</option>
+                        <option value="拉勾">拉勾</option>
+                        <option value="猎聘">猎聘</option>
+                    </select>
+                </div>
+                <button type="submit" class="primary">上传并解析</button>
+            </form>
+        </div>
+
+        <h2>📝 手动创建简历</h2>
+        <form id="createForm">
+            <div style="display:flex; gap:15px;">
+                <div class="form-group" style="flex:1;"><label>姓名:</label><input type="text" id="name" required></div>
+                <div class="form-group" style="flex:1;"><label>邮箱:</label><input type="email" id="email" required></div>
+                <div class="form-group" style="flex:1;"><label>电话:</label><input type="tel" id="phone"></div>
+                <div class="form-group" style="width:150px;"><label>来源:</label>
+                    <select id="source">
+                        <option>Boss直聘</option><option>拉勾</option><option>智联招聘</option><option>其他</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit">创建简历</button>
+        </form>
+
+        <h2>📋 简历列表</h2>
+        <div class="stats" id="stats"></div>
+        <table id="resumeTable">
+            <thead><tr><th>ID</th><th>姓名</th><th>邮箱</th><th>电话</th><th>来源</th><th>状态</th><th>文件</th><th>操作</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div class="modal-body">
+                <div class="pdf-viewer">
+                    <div class="pdf-controls">
+                        <button onclick="zoomOut()">-</button>
+                        <button onclick="prevPage()">◀</button>
+                        <input type="number" id="pageInput" min="1" value="1" style="width:50px;text-align:center;padding:5px;" onchange="goToPage(this.value)">
+                        <span id="pageInfo">/ 1</span>
+                        <button onclick="nextPage()">▶</button>
+                        <button onclick="zoomIn()">+</button>
+                    </div>
+                    <canvas id="pdfCanvas"></canvas>
+                </div>
+                <div class="detail-panel" id="detailPanel"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const API_BASE = '/api/v1';
+        let pdfDoc = null, currentPage = 1, pdfScale = 1.2;
+
+        function loadResumes() {
+            fetch(API_BASE + '/resumes').then(r => r.json()).then(d => {
+                if (d.code !== 0) return alert('加载失败: ' + d.message);
+                const list = d.data?.list || [];
+                document.getElementById('stats').innerHTML = '<span>总数: <b>' + (d.data?.total || 0) + '</b></span>';
+                const tbody = document.querySelector('#resumeTable tbody');
+                tbody.innerHTML = '';
+                list.forEach(r => {
+                    const id = r.ID || r.id, fileUrl = r.FileURL || r.file_url, status = r.Status || r.status;
+                    const fileCell = fileUrl
+                        ? '<button onclick="viewResume(\'' + id + '\')">预览</button> <button class="warning" onclick="parseResume(\'' + id + '\')">重解析</button>'
+                        : '<input type="file" id="file-' + id + '" style="display:none" accept=".pdf,.docx,.doc" onchange="uploadFile(\'' + id + '\')"><button class="success" onclick="document.getElementById(\'file-' + id + '\').click()">上传</button>';
+                    tbody.innerHTML += '<tr><td>' + id.substring(0,8) + '...</td><td>' + (r.Name || r.name) + '</td><td>' + (r.Email || r.email) + '</td><td>' + (r.Phone || r.phone || '-') + '</td><td>' + (r.Source || r.source) + '</td><td class="status-' + status + '">' + status + '</td><td>' + fileCell + '</td><td><button class="danger" onclick="deleteResume(\'' + id + '\')">删除</button></td></tr>';
+                });
+            });
+        }
+
+        function showPdfWithDetail(fileUrl, resume) {
+            currentPage = 1; pdfScale = 1.2;
+            renderDetailPanel(resume);
+            document.getElementById('detailModal').style.display = 'block';
+            if (fileUrl && fileUrl.toLowerCase().endsWith('.pdf')) {
+                pdfjsLib.getDocument(fileUrl).promise.then(doc => {
+                    pdfDoc = doc;
+                    renderPage(1);
+                }).catch(() => { document.getElementById('pdfCanvas').getContext('2d').fillText('PDF加载失败', 50, 50); });
+            } else {
+                pdfDoc = null;
+                const ctx = document.getElementById('pdfCanvas').getContext('2d');
+                ctx.clearRect(0, 0, 800, 600);
+                ctx.fillStyle = '#666'; ctx.font = '16px Arial';
+                ctx.fillText(fileUrl ? '非PDF文件，请直接下载查看' : '暂无文件', 50, 50);
+                document.getElementById('pageInfo').textContent = '/ -';
+                document.getElementById('pageInput').value = '-';
+            }
+        }
+
+        function renderDetailPanel(resume) {
+            const r = resume, pd = r.ParsedData || r.parsed_data;
+            let html = '<div class="parsed-section"><h4>基本信息</h4>';
+            html += '<p><b>姓名:</b> ' + (r.Name || r.name || '-') + '</p>';
+            html += '<p><b>邮箱:</b> ' + (r.Email || r.email || '-') + '</p>';
+            html += '<p><b>电话:</b> ' + (r.Phone || r.phone || '-') + '</p>';
+            html += '<p><b>来源:</b> ' + (r.Source || r.source || '-') + '</p>';
+            if (resume.FileURL || resume.file_url) {
+            html += '<p><b>文件:</b> <a href="' + (resume.FileURL || resume.file_url) + '" target="_blank">查看文件</a></p>';
+            }
+            html += '<p><b>状态:</b> <span class="status-' + (r.Status || r.status) + '">' + (r.Status || r.status) + '</span></p></div>';
+            if (pd) {
+                if (pd.summary) html += '<div class="parsed-section"><h4>简介</h4><p>' + pd.summary + '</p></div>';
+                if (pd.skills?.length) html += '<div class="parsed-section"><h4>技能</h4><p>' + pd.skills.join(', ') + '</p></div>';
+                if (pd.work_experience?.length) {
+                    html += '<div class="parsed-section"><h4>工作经历</h4>';
+                    pd.work_experience.forEach(w => { html += '<p><b>' + (w.company || '') + '</b> - ' + (w.position || '') + '<br><small>' + (w.start_date || '') + ' ~ ' + (w.end_date || '至今') + '</small></p>'; });
+                    html += '</div>';
+                }
+                if (pd.education?.length) {
+                    html += '<div class="parsed-section"><h4>教育</h4>';
+                    pd.education.forEach(e => { html += '<p><b>' + (e.school || '') + '</b> - ' + (e.degree || '') + '</p>'; });
+                    html += '</div>';
+                }
+            }
+            document.getElementById('detailPanel').innerHTML = html;
+        }
+
+        function renderPage(num) {
+            if (!pdfDoc || num < 1 || num > pdfDoc.numPages) return;
+            currentPage = num;
+            pdfDoc.getPage(num).then(page => {
+                const canvas = document.getElementById('pdfCanvas');
+                const ctx = canvas.getContext('2d');
+                const viewport = page.getViewport({ scale: pdfScale });
+                canvas.height = viewport.height; canvas.width = viewport.width;
+                page.render({ canvasContext: ctx, viewport: viewport });
+                document.getElementById('pageInfo').textContent = '/ ' + pdfDoc.numPages;
+                document.getElementById('pageInput').value = currentPage;
+            });
+        }
+
+        function prevPage() { if (pdfDoc && currentPage > 1) renderPage(currentPage - 1); }
+        function nextPage() { if (pdfDoc && currentPage < pdfDoc.numPages) renderPage(currentPage + 1); }
+        function goToPage(num) { renderPage(parseInt(num) || 1); }
+        function zoomIn() { pdfScale += 0.2; if (pdfDoc) renderPage(currentPage); }
+        function zoomOut() { if (pdfScale > 0.4) { pdfScale -= 0.2; if (pdfDoc) renderPage(currentPage); } }
+        function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (document.getElementById('detailModal').style.display !== 'block') return;
+            if (e.target.tagName === 'INPUT') return;
+            switch(e.key) {
+                case 'ArrowLeft': prevPage(); break;
+                case 'ArrowRight': nextPage(); break;
+                case 'ArrowUp': zoomIn(); break;
+                case 'ArrowDown': zoomOut(); break;
+                case 'Escape': closeModal(); break;
+            }
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const file = document.getElementById('uploadFile').files[0];
+            if (!file) return alert('请选择文件');
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('source', document.getElementById('uploadSource').value);
+            fetch(API_BASE + '/resumes/upload', { method: 'POST', body: formData }).then(r => r.json()).then(d => {
+                if (d.code === 0) { document.getElementById('uploadFile').value = ''; showPdfWithDetail(d.data.resume?.FileURL || d.data.resume?.file_url, d.data.resume); loadResumes(); }
+                else alert('上传失败: ' + d.message);
+            });
+        });
+
+        function uploadFile(id) {
+            const file = document.getElementById('file-' + id).files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            fetch(API_BASE + '/resumes/' + id + '/file', { method: 'POST', body: formData }).then(r => r.json()).then(d => {
+                if (d.code === 0) { alert('上传成功!'); loadResumes(); } else alert('上传失败: ' + d.message);
+            });
+        }
+
+        function parseResume(id) {
+            if (!confirm('确定要重新解析?')) return;
+            fetch(API_BASE + '/resumes/' + id + '/parse', { method: 'POST' }).then(r => r.json()).then(d => {
+                if (d.code === 0) { alert('解析成功!'); loadResumes(); } else alert('解析失败: ' + d.message);
+            });
+        }
+
+        document.getElementById('createForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch(API_BASE + '/resumes', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: document.getElementById('name').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value, source: document.getElementById('source').value })
+            }).then(r => r.json()).then(d => { if (d.code === 0) { alert('创建成功!'); this.reset(); loadResumes(); } else alert('创建失败: ' + d.message); });
+        });
+
+        function viewResume(id) {
+            fetch(API_BASE + '/resumes/' + id).then(r => r.json()).then(d => {
+                if (d.code === 0) { const r = d.data; showPdfWithDetail(r.FileURL || r.file_url, d.data); }
+            });
+        }
+
+        function deleteResume(id) {
+            if (confirm('确定删除?')) fetch(API_BASE + '/resumes/' + id, { method: 'DELETE' }).then(r => r.json()).then(d => { if (d.code === 0) { alert('删除成功'); loadResumes(); } else alert('删除失败: ' + d.message); });
+        }
+
+        loadResumes();
+    </script>
+</body>
+</html>

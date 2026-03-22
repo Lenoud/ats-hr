@@ -1,4 +1,5 @@
 // proto/resume.proto
+// protoc --go_out=. --go-grpc_out=. proto/resume.proto 2>&1 
 syntax = "proto3";
 
 package resume;
