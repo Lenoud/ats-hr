@@ -80,6 +80,50 @@ func NewResumeServiceWithLLM(repo repository.ResumeRepository, storage storage.F
 	}
 }
 
+func buildResumeEventPayload(resume *model.Resume) events.ResumeDocumentPayload {
+	return events.ResumeDocumentPayload{
+		ID:         resume.ID.String(),
+		Name:       resume.Name,
+		Email:      resume.Email,
+		Source:     resume.Source,
+		ParsedData: resume.ParsedData,
+		Status:     resume.Status,
+		CreatedAt:  resume.CreatedAt,
+		UpdatedAt:  resume.UpdatedAt,
+	}
+}
+
+func buildResumeParsedPayload(parsed *ParsedResume) events.ResumeParsedPayload {
+	if parsed == nil {
+		return events.ResumeParsedPayload{}
+	}
+
+	workExperience := make([]interface{}, 0, len(parsed.WorkExperience))
+	for _, item := range parsed.WorkExperience {
+		workExperience = append(workExperience, item)
+	}
+
+	education := make([]interface{}, 0, len(parsed.Education))
+	for _, item := range parsed.Education {
+		education = append(education, item)
+	}
+
+	return events.ResumeParsedPayload{
+		Name:           parsed.Name,
+		Email:          parsed.Email,
+		Phone:          parsed.Phone,
+		Summary:        parsed.Summary,
+		Skills:         parsed.Skills,
+		WorkExperience: workExperience,
+		Education:      education,
+		Languages:      parsed.Languages,
+		Certifications: parsed.Certifications,
+		Source:         parsed.Source,
+		UploadDate:     parsed.UploadDate,
+		RawText:        parsed.RawText,
+	}
+}
+
 // Create creates a new resume with default status
 func (s *resumeService) Create(ctx context.Context, input CreateResumeInput) (*model.Resume, error) {
 	resume := &model.Resume{
@@ -98,7 +142,7 @@ func (s *resumeService) Create(ctx context.Context, input CreateResumeInput) (*m
 
 	// Publish event
 	if s.publisher != nil {
-		_ = s.publisher.PublishCreated(ctx, resume.ID.String(), resume)
+		_ = s.publisher.PublishCreated(ctx, resume.ID.String(), buildResumeEventPayload(resume))
 	}
 
 	return resume, nil
@@ -167,7 +211,7 @@ func (s *resumeService) Update(ctx context.Context, id uuid.UUID, input UpdateRe
 
 	// Publish event
 	if s.publisher != nil {
-		_ = s.publisher.PublishUpdated(ctx, id.String(), updatedResume)
+		_ = s.publisher.PublishUpdated(ctx, id.String(), buildResumeEventPayload(updatedResume))
 	}
 
 	return updatedResume, nil
@@ -269,7 +313,7 @@ func (s *resumeService) UploadFile(ctx context.Context, id uuid.UUID, filename s
 
 	// Publish updated event
 	if s.publisher != nil {
-		_ = s.publisher.PublishUpdated(ctx, id.String(), updatedResume)
+		_ = s.publisher.PublishUpdated(ctx, id.String(), buildResumeEventPayload(updatedResume))
 	}
 
 	return updatedResume, nil
@@ -387,7 +431,7 @@ func (s *resumeService) ParseResume(ctx context.Context, id uuid.UUID) (*ParsedR
 	// Publish parsed event
 	if s.publisher != nil {
 		_ = s.publisher.PublishStatusChanged(ctx, id.String(), model.StatusProcessing, model.StatusParsed)
-		_ = s.publisher.PublishParsed(ctx, id.String(), parsed)
+		_ = s.publisher.PublishParsed(ctx, id.String(), buildResumeParsedPayload(parsed))
 	}
 
 	return parsed, nil
@@ -483,14 +527,14 @@ func (s *resumeService) UploadAndParse(ctx context.Context, filename string, rea
 
 	// Publish events
 	if s.publisher != nil {
-		_ = s.publisher.PublishCreated(ctx, resume.ID.String(), resume)
+		_ = s.publisher.PublishCreated(ctx, resume.ID.String(), buildResumeEventPayload(resume))
 		if parseErr != nil {
 			// Publish failed status
 			_ = s.publisher.PublishStatusChanged(ctx, resume.ID.String(), model.StatusPending, model.StatusFailed)
 		} else {
 			// Publish parsed status
 			_ = s.publisher.PublishStatusChanged(ctx, resume.ID.String(), model.StatusPending, model.StatusParsed)
-			_ = s.publisher.PublishParsed(ctx, resume.ID.String(), parsed)
+			_ = s.publisher.PublishParsed(ctx, resume.ID.String(), buildResumeParsedPayload(parsed))
 		}
 	}
 

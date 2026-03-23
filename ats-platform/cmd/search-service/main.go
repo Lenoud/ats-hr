@@ -52,22 +52,6 @@ type Config struct {
 	ConsumerEnabled bool
 }
 
-type resumeEventPayload struct {
-	ID         string                 `json:"id"`
-	Name       string                 `json:"name"`
-	Email      string                 `json:"email"`
-	Source     string                 `json:"source"`
-	ParsedData map[string]interface{} `json:"parsed_data"`
-	Status     string                 `json:"status"`
-	CreatedAt  time.Time              `json:"created_at"`
-	UpdatedAt  time.Time              `json:"updated_at"`
-}
-
-type statusChangedPayload struct {
-	OldStatus string `json:"old_status"`
-	NewStatus string `json:"new_status"`
-}
-
 func loadConfig() *Config {
 	serviceName := getEnv("SERVICE_NAME", "search-service")
 	httpPort := getEnv("HTTP_PORT", "8083")
@@ -294,8 +278,8 @@ func handleSearchEvent(ctx context.Context, searchSvc service.SearchService, eve
 	logger.Infof("Processing resume event: resume_id=%s action=%s", event.ResumeID, event.Action)
 
 	switch event.Action {
-	case "created", "updated":
-		var payload resumeEventPayload
+	case events.ActionCreated, events.ActionUpdated:
+		var payload events.ResumeDocumentPayload
 		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
 			return fmt.Errorf("unmarshal resume payload: %w", err)
 		}
@@ -306,15 +290,15 @@ func handleSearchEvent(ctx context.Context, searchSvc service.SearchService, eve
 		}
 		return nil
 
-	case "deleted":
+	case events.ActionDeleted:
 		err := searchSvc.DeleteResume(ctx, event.ResumeID)
 		if err != nil && err != repository.ErrNotFound {
 			return fmt.Errorf("delete resume document: %w", err)
 		}
 		return nil
 
-	case "status_changed":
-		var payload statusChangedPayload
+	case events.ActionStatusChanged:
+		var payload events.ResumeStatusChangedPayload
 		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
 			return fmt.Errorf("unmarshal status payload: %w", err)
 		}
@@ -327,7 +311,7 @@ func handleSearchEvent(ctx context.Context, searchSvc service.SearchService, eve
 		}
 		return nil
 
-	case "parsed":
+	case events.ActionParsed:
 		return nil
 
 	default:
@@ -336,7 +320,7 @@ func handleSearchEvent(ctx context.Context, searchSvc service.SearchService, eve
 	}
 }
 
-func buildResumeDocument(resumeID string, payload resumeEventPayload) *model.ResumeDocument {
+func buildResumeDocument(resumeID string, payload events.ResumeDocumentPayload) *model.ResumeDocument {
 	skills := extractStringSlice(payload.ParsedData, "skills")
 	education := strings.Join(extractStringSlice(payload.ParsedData, "education"), "\n")
 	workHistory := strings.Join(extractStringSlice(payload.ParsedData, "work_experience"), "\n")

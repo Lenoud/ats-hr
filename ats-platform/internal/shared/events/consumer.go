@@ -9,10 +9,11 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// ResumeEvent represents a resume event from Redis Stream
+// ResumeEvent represents a resume event from Redis Stream.
+// Action values are defined by the shared contract constants in contracts.go.
 type ResumeEvent struct {
 	ResumeID string `json:"resume_id"`
-	Action   string `json:"action"` // created, updated, deleted
+	Action   string `json:"action"`
 	Payload  string `json:"payload,omitempty"`
 }
 

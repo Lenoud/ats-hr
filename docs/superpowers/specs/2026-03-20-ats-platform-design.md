@@ -81,7 +81,7 @@
 |------|------|------|
 | 前端 → 后端 | HTTP REST | Gin 框架，统一响应格式 |
 | 服务间同步调用 | gRPC | `resume-service` 与 `interview-service` 已提供 gRPC 接口 |
-| 事件通知 | Redis Streams | `resume-service` 发布事件，`search-service` 消费并维护索引 |
+| 事件通知 | Redis Streams | `resume-service` 与 `search-service` 通过 `internal/shared/events/` 中的共享事件契约协作 |
 
 ---
 
@@ -144,6 +144,7 @@ ats-platform/internal/shared/
 ├── storage/
 │   └── minio.go             # MinIO 文件存储 (上传/下载/预签名)
 ├── events/
+│   ├── contracts.go         # 共享事件 action / payload 契约
 │   ├── publisher.go         # Redis Streams 事件发布
 │   └── consumer.go          # Redis Streams Consumer Group 消费
 ├── llm/
@@ -165,7 +166,7 @@ ats-platform/internal/shared/
 
 - `resume-service` 同时提供 HTTP 和 gRPC，负责简历主数据、文件上传、解析和事件发布。
 - `interview-service` 同时提供 HTTP 和 gRPC，覆盖面试、面评和作品集管理。
-- `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过 Redis Stream 消费 `resume:events` 并将简历索引到 Elasticsearch。
+- `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过共享事件契约消费 `resume:events` 并将简历索引到 Elasticsearch。
 - `gateway` 当前是轻量级路径代理，不依赖 Consul 做动态发现，服务地址仍在代码中静态配置。
 
 ### 共享模块使用示例
