@@ -4,11 +4,17 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log"
 	"net"
+	"net/http"
 	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -17,6 +23,7 @@ import (
 	"github.com/example/ats-platform/internal/interview/handler"
 	"github.com/example/ats-platform/internal/interview/repository"
 	"github.com/example/ats-platform/internal/interview/service"
+	"github.com/example/ats-platform/internal/shared/consul"
 	"github.com/example/ats-platform/internal/shared/database"
 	"github.com/example/ats-platform/internal/shared/events"
 	"github.com/example/ats-platform/internal/shared/logger"
@@ -29,10 +36,13 @@ var indexHTML string
 
 // Config holds application configuration
 type Config struct {
+	ServiceName string
 	HTTPHost    string
 	HTTPPort    string
 	GRPCHost    string
 	GRPCPort    string
+	ConsulHost  string
+	ConsulPort  string
 	DBHost      string
 	DBPort      string
 	DBUser      string
@@ -44,10 +54,13 @@ type Config struct {
 
 func loadConfig() *Config {
 	return &Config{
+		ServiceName: getEnv("SERVICE_NAME", "interview-service"),
 		GRPCHost:    getEnv("GRPC_HOST", "0.0.0.0"),
 		GRPCPort:    getEnv("GRPC_PORT", "9091"),
 		HTTPHost:    getEnv("HTTP_HOST", "0.0.0.0"),
 		HTTPPort:    getEnv("HTTP_PORT", "8082"),
+		ConsulHost:  getEnv("CONSUL_HOST", "192.168.1.40"),
+		ConsulPort:  getEnv("CONSUL_PORT", "8500"),
 		DBHost:      getEnv("DB_HOST", "192.168.250.233"),
 		DBPort:      getEnv("DB_PORT", "5432"),
 		DBUser:      getEnv("DB_USER", "postgres"),
@@ -109,6 +122,28 @@ func main() {
 		publisher = events.NewEventPublisher(redisClient, cfg.RedisStream)
 		fmt.Printf("✅ Connected to Redis: %s (stream: %s)\n", cfg.RedisAddr, cfg.RedisStream)
 	}
+	if publisher != nil {
+		fmt.Printf("✅ Redis Events: Enabled\n")
+	}
+
+	// ====================== Consul Registration ======================
+	consulClient, err := consul.NewConsul(cfg.ConsulHost + ":" + cfg.ConsulPort)
+	if err != nil {
+		log.Fatalf("NewConsul failed: %v", err)
+	}
+	ipObj, err := consul.GetOutboundIP()
+	if err != nil {
+		log.Fatalf("GetOutboundIP failed: %v", err)
+	}
+	ip := ipObj.String()
+
+	grpcPort, _ := strconv.Atoi(cfg.GRPCPort)
+	uuid := uuid.NewString()
+	serviceId := fmt.Sprintf("%s-%s-%d-%s", cfg.ServiceName, ip, grpcPort, uuid)
+	if err := consulClient.RegisterService(cfg.ServiceName, ip, grpcPort, uuid); err != nil {
+		log.Fatalf("RegisterService failed: %v", err)
+	}
+	fmt.Println("✅ Registered service to Consul with ID:", serviceId)
 
 	// Initialize layered architecture
 	interviewRepo := repository.NewInterviewRepository(postgresClient.GetDB())
@@ -124,6 +159,7 @@ func main() {
 	portfolioHandler := handler.NewPortfolioHandler(portfolioSvc)
 
 	// Start gRPC server
+	var grpcSrv *grpc.Server
 	go func() {
 		grpcAddr := cfg.GRPCHost + ":" + cfg.GRPCPort
 		lis, err := net.Listen("tcp", grpcAddr)
@@ -131,14 +167,14 @@ func main() {
 			fmt.Printf("❌ gRPC listen failed: %v\n", err)
 			return
 		}
-		grpcSrv := grpc.NewServer()
+		grpcSrv = grpc.NewServer()
 		interview.RegisterInterviewServiceServer(grpcSrv, grpcHandler.NewInterviewServiceServer(interviewSvc))
 		interview.RegisterFeedbackServiceServer(grpcSrv, grpcHandler.NewFeedbackServiceServer(feedbackSvc))
 		interview.RegisterPortfolioServiceServer(grpcSrv, grpcHandler.NewPortfolioServiceServer(portfolioSvc))
 		reflection.Register(grpcSrv)
 		fmt.Printf("🚀 gRPC Server running on %s\n", grpcAddr)
 		if err := grpcSrv.Serve(lis); err != nil {
-			fmt.Printf("gRPC server error: %v\n", err)
+			fmt.Printf("gRPC server closed: %v\n", err)
 		}
 	}()
 
@@ -206,18 +242,53 @@ func main() {
 		api.DELETE("/portfolios/:id", portfolioHandler.Delete)
 	}
 
-	// Start HTTP server
-	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
-	fmt.Printf("🚀 HTTP Server running on http://%s\n", addr)
-	fmt.Printf("   gRPC: %s:%s\n", cfg.GRPCHost, cfg.GRPCPort)
-	fmt.Printf("   Database: %s@%s:%s/%s\n", cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
-	fmt.Printf("   Redis: %s (stream: %s)\n", cfg.RedisAddr, cfg.RedisStream)
-	if publisher != nil {
-		fmt.Printf("   Events: Enabled\n")
+	// ====================== 改造：用http.Server替代router.Run，支持优雅关闭 ======================
+	httpSrv := &http.Server{
+		Addr:    cfg.HTTPHost + ":" + cfg.HTTPPort,
+		Handler: router,
 	}
-	fmt.Printf("   Architecture: Handler → Service -> Repository\n")
 
-	if err := router.Run(addr); err != nil {
-		fmt.Printf("Server error: %v\n", err)
+	// 启动HTTP服务
+	go func() {
+		fmt.Printf("🚀 HTTP Server running on http://%s\n", httpSrv.Addr)
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server failed: %v", err)
+		}
+	}()
+
+	// ====================== 新增：优雅退出核心逻辑 ======================
+	// 监听系统退出信号（Ctrl+C、kill）
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	<-quit // 阻塞等待信号
+	fmt.Println("\n🛑 开始优雅关闭服务...")
+
+	// 2. Close HTTP Server with timeout
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("HTTP关闭失败: %v", err)
+	} else {
+		fmt.Println("✅ HTTP服务已优雅关闭")
+	}
+
+	// 3. Close gRPC
+	if grpcSrv != nil {
+		grpcSrv.GracefulStop()
+		fmt.Println("✅ gRPC服务已优雅关闭")
+	}
+
+	// 4. Consul反注册服务
+	if err := consulClient.Deregister(serviceId); err != nil {
+		log.Printf("❌ Consul反注册失败: %v", err)
+	} else {
+		fmt.Println("✅ 服务已从Consul注销")
+	}
+
+	// 5. Close Redis
+	if err := redisClient.Close(); err != nil {
+		log.Printf("Redis关闭失败: %v", err)
+	} else {
+		fmt.Println("✅ Redis已关闭")
 	}
 }
