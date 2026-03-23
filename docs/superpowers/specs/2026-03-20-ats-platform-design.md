@@ -167,7 +167,7 @@ ats-platform/internal/shared/
 - `resume-service` 同时提供 HTTP 和 gRPC，负责简历主数据、文件上传、解析和事件发布。
 - `interview-service` 同时提供 HTTP 和 gRPC，覆盖面试、面评和作品集管理。
 - `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过共享事件契约消费 `resume:events` 并将简历索引到 Elasticsearch。
-- `gateway` 当前是轻量级路径代理，不依赖 Consul 做动态发现，服务地址仍在代码中静态配置。
+- `gateway` 当前是轻量级路径代理，按路径前缀决定目标服务，并通过 Consul 动态解析可用实例地址。
 
 ### 共享模块使用示例
 

@@ -4,31 +4,48 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-// 后端服务配置
-var services = map[string]string{
-	"resume":    "http://localhost:8081",
-	"interview": "http://localhost:8082",
-	"search":    "http://localhost:8083",
+type config struct {
+	HTTPHost   string
+	HTTPPort   string
+	ConsulHost string
+	ConsulPort string
 }
 
-// 检查服务状态
-func checkServiceStatus(serviceURL string) string {
-	resp, err := http.Get(serviceURL + "/health")
-	if err != nil {
-		return "offline"
-	}
-	defer resp.Body.Close()
-	return "ok"
+type routeTarget struct {
+	ServiceKey  string
+	ServiceName string
 }
 
-// HTML 前端页面
-const indexHTML = `<!DOCTYPE html>
+var routeTargets = []struct {
+	Prefix string
+	Target routeTarget
+}{
+	{
+		Prefix: "/resumes",
+		Target: routeTarget{ServiceKey: "resume", ServiceName: "resume-service"},
+	},
+	{
+		Prefix: "/interviews",
+		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service"},
+	},
+	{
+		Prefix: "/portfolios",
+		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service"},
+	},
+	{
+		Prefix: "/search",
+		Target: routeTarget{ServiceKey: "search", ServiceName: "search-service"},
+	},
+}
+
+const indexHTMLTemplate = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -38,11 +55,11 @@ const indexHTML = `<!DOCTYPE html>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
-        .header { background: linear-gradient(135deg, #1976d3, #1565c0); color: white; padding: 20px; text-align: center; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0 1); }
+        .header { background: linear-gradient(135deg, #1976d3, #1565c0); color: white; padding: 20px; text-align: center; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .header h1 { font-size: 28px; margin-bottom: 5px; }
         .header p { opacity: 0.9; }
         .status-bar { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
-        .status-card { flex: 1; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,    1); min-width: 200px; }
+        .status-card { flex: 1; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); min-width: 200px; }
         .status-card h3 { color: #666; font-size: 14px; margin-bottom: 5px; }
         .status-card .value { font-size: 20px; font-weight: bold; }
         .status-card.ok .value { color: #4caf50; }
@@ -75,25 +92,27 @@ const indexHTML = `<!DOCTYPE html>
         </div>
 
         <div class="links">
-            <a href="http://localhost:8081" target="_blank">简历管理</a>
-            <a href="http://localhost:8082" target="_blank">面试管理</a>
-            <a href="http://localhost:8083" target="_blank">简历搜索</a>
+            <a href="%s" target="_blank">简历管理</a>
+            <a href="%s" target="_blank">面试管理</a>
+            <a href="%s" target="_blank">简历搜索</a>
         </div>
     </div>
 
     <script>
         function checkStatus() {
             fetch('/health')
-                .then(r => r.json())
-                .then(data => {
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
                     for (var service in data.services) {
                         var card = document.getElementById(service + '-status');
-                        if (card) {
-                            var status = data.services[service];
-                            card.classList.remove('ok', 'error');
-                            card.classList.add(status);
-                            card.querySelector('.value').textContent = status === 'ok' ? 'Online' : 'Offline';
+                        if (!card) {
+                            continue;
                         }
+                        var item = data.services[service];
+                        var status = item.status || 'error';
+                        card.classList.remove('ok', 'error');
+                        card.classList.add(status === 'ok' ? 'ok' : 'error');
+                        card.querySelector('.value').textContent = status === 'ok' ? 'Online' : 'Offline';
                     }
                 });
         }
@@ -103,103 +122,193 @@ const indexHTML = `<!DOCTYPE html>
 </body>
 </html>`
 
+func loadConfig() *config {
+	return &config{
+		HTTPHost:   getEnv("HTTP_HOST", "0.0.0.0"),
+		HTTPPort:   getEnv("HTTP_PORT", "8080"),
+		ConsulHost: getEnv("CONSUL_HOST", "127.0.0.1"),
+		ConsulPort: getEnv("CONSUL_PORT", "8500"),
+	}
+}
+
+func getEnv(key, defaultVal string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultVal
+}
+
 func main() {
+	cfg := loadConfig()
+	discovery, err := newServiceDiscovery(cfg.ConsulHost + ":" + cfg.ConsulPort)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create consul discovery client: %v", err))
+	}
+
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
-	// CORS
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 		c.Next()
 	})
 
-	// 首页
 	r.GET("/", func(c *gin.Context) {
+		resumeURL := discoverServiceURL(discovery, "resume-service")
+		interviewURL := discoverServiceURL(discovery, "interview-service")
+		searchURL := discoverServiceURL(discovery, "search-service")
+
 		c.Header("Content-Type", "text/html; charset=utf-8")
-		c.String(200, indexHTML)
+		c.String(http.StatusOK, fmt.Sprintf(indexHTMLTemplate, resumeURL, interviewURL, searchURL))
 	})
 
-	// 健康检查
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
+		c.JSON(http.StatusOK, gin.H{
 			"service": "api-gateway",
 			"status":  "ok",
 			"services": gin.H{
-				"resume":    checkServiceStatus(services["resume"]),
-				"interview": checkServiceStatus(services["interview"]),
-               	"search":    checkServiceStatus(services["search"]),
-            },
+				"resume":    checkServiceStatus(discovery, "resume-service"),
+				"interview": checkServiceStatus(discovery, "interview-service"),
+				"search":    checkServiceStatus(discovery, "search-service"),
+			},
 			"time": time.Now().Format(time.RFC3339),
 		})
 	})
 
-	// API 代理 - 使用通配符匹配所有路径
-	r.Any("/api/v1/*action", proxyHandler)
+	r.Any("/api/v1/*action", func(c *gin.Context) {
+		proxyHandler(c, discovery)
+	})
 
-	fmt.Println("API Gateway running on http://0.0.0.0:8080")
-	r.Run("0.0.0.0:8080")
+	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
+	fmt.Printf("API Gateway running on http://%s\n", addr)
+	if err := r.Run(addr); err != nil {
+		panic(fmt.Sprintf("failed to run gateway: %v", err))
+	}
 }
 
-// proxyHandler 统一处理所有代理请求
-func proxyHandler(c *gin.Context) {
+func discoverServiceURL(discovery *serviceDiscovery, serviceName string) string {
+	instance, err := discovery.resolve(serviceName)
+	if err != nil {
+		return "#"
+	}
+	return instance.externalURL()
+}
+
+func checkServiceStatus(discovery *serviceDiscovery, serviceName string) gin.H {
+	instance, err := discovery.resolve(serviceName)
+	if err != nil {
+		return gin.H{
+			"status": "error",
+			"error":  err.Error(),
+		}
+	}
+
+	resp, err := http.Get(instance.baseURL() + "/health")
+	if err != nil {
+		return gin.H{
+			"status":  "error",
+			"address": instance.baseURL(),
+			"error":   err.Error(),
+		}
+	}
+	defer resp.Body.Close()
+
+	status := "ok"
+	if resp.StatusCode >= http.StatusBadRequest {
+		status = "error"
+	}
+
+	return gin.H{
+		"status":      status,
+		"address":     instance.baseURL(),
+		"status_code": resp.StatusCode,
+	}
+}
+
+func resolveRouteTarget(path string) (*routeTarget, bool) {
+	for _, item := range routeTargets {
+		if strings.HasPrefix(path, item.Prefix) {
+			target := item.Target
+			return &target, true
+		}
+	}
+	return nil, false
+}
+
+func proxyHandler(c *gin.Context, discovery *serviceDiscovery) {
 	path := c.Param("action")
+	target, ok := resolveRouteTarget(path)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "unknown service route",
+			"path":  path,
+		})
+		return
+	}
 
-	// 根据路径决定转发到哪个服务
-	var targetService string
-	if strings.HasPrefix(path, "/resumes") {
-		targetService = services["resume"]
-	} else if strings.HasPrefix(path, "/interviews") || strings.HasPrefix(path, "/portfolios") {
-		targetService = services["interview"]
-	} else if strings.HasPrefix(path, "/search") {
-		targetService = services["search"]
-	} else {
-		c.JSON(404, gin.H{"error": "unknown service"})
-	 return
-	 }
+	instance, err := discovery.resolve(target.ServiceName)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error":   "service discovery failed",
+			"service": target.ServiceName,
+			"detail":  err.Error(),
+		})
+		return
+	}
 
-	// 构建目标URL
-	targetURL := targetService + "/api/v1" + path
-
-	// 添加查询参数
+	targetURL := instance.baseURL() + "/api/v1" + path
 	if c.Request.URL.RawQuery != "" {
-	 targetURL += "?" + c.Request.URL.RawQuery
-    }
-	// 创建请求
-    req, err := http.NewRequest(c.Request.Method, targetURL, c.Request.Body)
-    if err != nil {
-        c.JSON(500, gin.H{"error": err.Error()})
-        return
-    }
-    // 复制请求头
-    for key, values := range c.Request.Header {
-        for _, value := range values {
-            req.Header.Add(key, value)
-        }
-    }
+		targetURL += "?" + c.Request.URL.RawQuery
+	}
 
-    // 发送请求
-    client := &http.Client{Timeout: 30 * time.Second}
-    resp, err := client.Do(req)
-    if err != nil {
-        c.JSON(500, gin.H{"error": err.Error()})
-        return
-    }
-    defer resp.Body.Close()
+	req, err := http.NewRequestWithContext(c.Request.Context(), c.Request.Method, targetURL, c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "failed to create upstream request",
+			"service": target.ServiceName,
+			"detail":  err.Error(),
+		})
+		return
+	}
 
-    // 复制响应头
-    for key, values := range resp.Header {
-        for _, value := range values {
-            c.Header(key, value)
-        }
-    }
+	for key, values := range c.Request.Header {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
 
-    // 返回响应
-    c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), []byte{})
-    io.Copy(c.Writer, resp.Body)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error":    "upstream request failed",
+			"service":  target.ServiceName,
+			"upstream": instance.baseURL(),
+			"detail":   err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Header(key, value)
+		}
+	}
+
+	c.Status(resp.StatusCode)
+	if _, err := io.Copy(c.Writer, resp.Body); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error":    "failed to stream upstream response",
+			"service":  target.ServiceName,
+			"upstream": instance.baseURL(),
+			"detail":   err.Error(),
+		})
+	}
 }

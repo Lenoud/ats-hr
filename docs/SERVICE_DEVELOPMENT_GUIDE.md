@@ -955,7 +955,7 @@ func (s *resumeService) Create(input CreateResumeInput) (*model.Resume, error) {
 
 - 当前 `gateway` 实现集中在 `cmd/gateway/main.go`，没有单独的 `internal/gateway/` 领域目录。
 - 它提供首页、`/health` 聚合检查和 `/api/v1/*` 的路径前缀代理。
-- 当前代理目标服务地址仍为静态配置，不通过 Consul 做动态发现。
+- 当前代理目标服务通过 Consul 动态解析，路径前缀仍然决定逻辑服务名，网关本身保持轻量，不额外承担鉴权、限流或负载均衡编排。
 
 ### 本地开发启动约定
 
