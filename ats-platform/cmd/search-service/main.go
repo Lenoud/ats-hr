@@ -162,11 +162,12 @@ func main() {
 	ip := ipObj.String()
 	httpPort, _ := strconv.Atoi(cfg.HTTPPort)
 	instanceUUID := uuid.NewString()
-	serviceID := fmt.Sprintf("%s-%s-%d-%s", cfg.ServiceName, ip, httpPort, instanceUUID)
-	if err := consulClient.RegisterService(cfg.ServiceName, ip, httpPort, instanceUUID); err != nil {
+	httpServiceName := cfg.ServiceName + "-http"
+	serviceID := consul.ServiceID(httpServiceName, ip, httpPort, instanceUUID)
+	if err := consulClient.RegisterService(httpServiceName, ip, httpPort, instanceUUID); err != nil {
 		log.Fatalf("register service failed: %v", err)
 	}
-	logger.Infof("Registered service to Consul with ID: %s", serviceID)
+	logger.Infof("Registered HTTP service to Consul with ID: %s", serviceID)
 
 	var consumerCancel context.CancelFunc
 	if cfg.ConsumerEnabled && redisReady {

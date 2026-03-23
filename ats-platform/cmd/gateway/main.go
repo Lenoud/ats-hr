@@ -41,7 +41,7 @@ var routeTargets = []struct {
 	},
 	{
 		Prefix: "/search",
-		Target: routeTarget{ServiceKey: "search", ServiceName: "search-service"},
+		Target: routeTarget{ServiceKey: "search", ServiceName: "search-service-http"},
 	},
 }
 
@@ -162,7 +162,7 @@ func main() {
 	r.GET("/", func(c *gin.Context) {
 		resumeURL := discoverServiceURL(discovery, "resume-service-http")
 		interviewURL := discoverServiceURL(discovery, "interview-service-http")
-		searchURL := discoverServiceURL(discovery, "search-service")
+		searchURL := discoverServiceURL(discovery, "search-service-http")
 
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.String(http.StatusOK, fmt.Sprintf(indexHTMLTemplate, resumeURL, interviewURL, searchURL))
@@ -175,7 +175,7 @@ func main() {
 			"services": gin.H{
 				"resume":    checkServiceStatus(discovery, "resume-service-http"),
 				"interview": checkServiceStatus(discovery, "interview-service-http"),
-				"search":    checkServiceStatus(discovery, "search-service"),
+				"search":    checkServiceStatus(discovery, "search-service-http"),
 			},
 			"time": time.Now().Format(time.RFC3339),
 		})

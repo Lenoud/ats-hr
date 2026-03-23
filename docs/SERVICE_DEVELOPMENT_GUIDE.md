@@ -949,6 +949,7 @@ func (s *resumeService) Create(input CreateResumeInput) (*model.Resume, error) {
 - 当前实现包含 `handler -> service -> repository` 三层，以及 `cmd/search-service/main.go` 中的 Redis Stream consumer 启动逻辑。
 - `internal/search/repository/es_repository.go` 已实现 Elasticsearch 索引创建、搜索、删除和状态更新。
 - `search-service` 当前只提供 HTTP 接口：`GET /api/v1/search` 与 `POST /api/v1/search/advanced`。
+- `search-service` 在 Consul 中按统一命名约定注册为 `search-service-http`，当前没有对应的 gRPC 实例注册。
 - `resume-service` 与 `search-service` 之间的 Redis Stream action / payload 语义应统一收敛到 `ats-platform/internal/shared/events/contracts.go`，避免两端各自维护一份隐式约定。
 
 ### gateway

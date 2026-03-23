@@ -175,7 +175,7 @@ HTTP 响应通过共享 `response` 包统一封装，分页搜索接口返回：
 
 ### Consul
 
-服务启动时会注册到 Consul，默认配置：
+服务启动时会注册到 Consul，当前注册名为 `search-service-http`，默认配置：
 
 | 环境变量 | 默认值 |
 |----------|--------|
@@ -204,7 +204,7 @@ HTTP 响应通过共享 `response` 包统一封装，分页搜索接口返回：
 
 ## 边界与已知限制
 
-- 当前不提供 gRPC 接口。
+- 当前不提供 gRPC 接口；在 Consul 服务发现中仅注册 HTTP 实例 `search-service-http`。
 - 服务依赖共享事件契约中的 `ResumeDocumentPayload` 与 `ResumeStatusChangedPayload` 来建立搜索文档和同步状态。
-- 当前网关通过路径前缀将 `/api/v1/search*` 请求转发到本服务，但并未通过 Consul 做动态路由。
+- 当前网关通过路径前缀将 `/api/v1/search*` 请求转发到本服务，并通过 `search-service-http` 做动态路由。
 - 本文档不包含未实现的测试计划或未来重构方案，只描述仓库现状。

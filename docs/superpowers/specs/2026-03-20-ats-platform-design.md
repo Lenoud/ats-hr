@@ -70,7 +70,7 @@
 
 | 服务 | 职责 | HTTP 端口 | gRPC 端口 | 状态 |
 |------|------|-----------|-----------|------|
-| API Gateway | 静态首页、健康聚合、基于路径前缀的反向代理 | 8080 | - | ✅ 已实现 |
+| API Gateway | 静态首页、健康聚合、基于路径前缀的反向代理与 Consul HTTP 服务发现 | 8080 | - | ✅ 已实现 |
 | Resume Service | 简历上传、解析、CRUD、事件发布 | 8081 | 9090 | ✅ 已实现 |
 | Interview Service | 面试流程、面评、作品集 | 8082 | 9091 | ✅ 已实现 |
 | Search Service | 简历搜索、筛选、Redis Stream 消费、Elasticsearch 索引维护 | 8083 | - | ✅ 已实现 |
@@ -166,7 +166,7 @@ ats-platform/internal/shared/
 
 - `resume-service` 同时提供 HTTP 和 gRPC，负责简历主数据、文件上传、解析和事件发布。
 - `interview-service` 同时提供 HTTP 和 gRPC，覆盖面试、面评和作品集管理。
-- `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过共享事件契约消费 `resume:events` 并将简历索引到 Elasticsearch。
+- `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过共享事件契约消费 `resume:events` 并将简历索引到 Elasticsearch，并在 Consul 中注册为 `search-service-http`。
 - `gateway` 当前是轻量级路径代理，按路径前缀决定目标服务，并通过 Consul 动态解析可用实例地址。
 
 ### 共享模块使用示例
