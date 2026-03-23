@@ -70,18 +70,18 @@
 
 | 服务 | 职责 | HTTP 端口 | gRPC 端口 | 状态 |
 |------|------|-----------|-----------|------|
-| API Gateway | 路由聚合、反向代理 | 8080 | - | 规划中 |
-| Resume Service | 简历上传、解析、CRUD | 8081 | 9090 | ✅ 已完成 |
-| Interview Service | 面试流程、面评、作品集 | 8082 | 9091 | 待开发 |
-| Search Service | 简历搜索、筛选 | 8083 | 9092 | 待开发 |
+| API Gateway | 静态首页、健康聚合、基于路径前缀的反向代理 | 8080 | - | ✅ 已实现 |
+| Resume Service | 简历上传、解析、CRUD、事件发布 | 8081 | 9090 | ✅ 已实现 |
+| Interview Service | 面试流程、面评、作品集 | 8082 | 9091 | ✅ 已实现 |
+| Search Service | 简历搜索、筛选、Redis Stream 消费、Elasticsearch 索引维护 | 8083 | - | ✅ 已实现 |
 
 ### 通信方式
 
 | 场景 | 协议 | 说明 |
 |------|------|------|
 | 前端 → 后端 | HTTP REST | Gin 框架，统一响应格式 |
-| 服务间同步调用 | gRPC | Protobuf 序列化，高性能 |
-| 事件通知 | Redis Streams | 异步解耦，最终一致性 |
+| 服务间同步调用 | gRPC | `resume-service` 与 `interview-service` 已提供 gRPC 接口 |
+| 事件通知 | Redis Streams | `resume-service` 发布事件，`search-service` 消费并维护索引 |
 
 ---
 
@@ -132,19 +132,20 @@
 
 ## 共享模块设计
 
-所有服务共享 `internal/shared/` 下的基础设施模块：
+所有服务共享 `ats-platform/internal/shared/` 下的基础设施模块：
 
 ### 目录结构
 
 ```
-internal/shared/
+ats-platform/internal/shared/
 ├── database/
-│   └── postgres.go          # PostgreSQL 连接池管理
+│   ├── postgres.go          # PostgreSQL 连接池管理
+│   └── elasticsearch.go     # Elasticsearch 客户端封装
 ├── storage/
 │   └── minio.go             # MinIO 文件存储 (上传/下载/预签名)
 ├── events/
 │   ├── publisher.go         # Redis Streams 事件发布
-│   └── consumer.go          # 事件消费 (待实现)
+│   └── consumer.go          # Redis Streams Consumer Group 消费
 ├── llm/
 │   └── client.go            # LLM API 客户端 (Moonshot/OpenAI 兼容)
 ├── logger/
@@ -156,10 +157,16 @@ internal/shared/
 ├── response/
 │   └── response.go          # 统一 HTTP 响应
 └── pb/
-    └── resume/              # Protobuf 生成代码
-        ├── resume.pb.go
-        └── resume_grpc.pb.go
+    ├── resume/              # Resume Service protobuf 生成代码
+    └── interview/           # Interview Service protobuf 生成代码
 ```
+
+### 当前实现状态说明
+
+- `resume-service` 同时提供 HTTP 和 gRPC，负责简历主数据、文件上传、解析和事件发布。
+- `interview-service` 同时提供 HTTP 和 gRPC，覆盖面试、面评和作品集管理。
+- `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过 Redis Stream 消费 `resume:events` 并将简历索引到 Elasticsearch。
+- `gateway` 当前是轻量级路径代理，不依赖 Consul 做动态发现，服务地址仍在代码中静态配置。
 
 ### 共享模块使用示例
 

@@ -13,6 +13,8 @@
 | `interview.FeedbackService` | 面试反馈管理 |
 | `interview.PortfolioService` | 作品集管理 |
 
+> 当前接口以 `proto/interview.proto` 与 `internal/interview/grpc/server.go` 为准。本文档已按当前实现补充已定义但能力有限的方法说明。
+
 ## 测试命令
 
 ### 列出所有服务
@@ -77,6 +79,21 @@ grpcurl -plaintext -d '{
 }' localhost:9091 interview.InterviewService/GetInterview
 ```
 
+### UpdateInterview - 更新面试基本信息
+
+```bash
+grpcurl -plaintext -d '{
+  "id": "<面试UUID>",
+  "round": 2,
+  "interviewer": "李四",
+  "scheduled_at": 1735689600
+}' localhost:9091 interview.InterviewService/UpdateInterview
+```
+
+**说明:**
+- 该方法已在 proto 中定义并由服务端暴露。
+- 当前实现会返回更新后的对象视图，但底层持久化更新能力仍不完整，不应视为完整编辑接口。
+
 ### ListInterviews - 查询面试列表
 
 ```bash
@@ -94,6 +111,10 @@ grpcurl -plaintext -d '{
 - `resume_id`: 按简历 ID 筛选
 - `status`: 按状态筛选 (scheduled/completed/cancelled)
 
+**当前限制:**
+- 仅在提供 `resume_id` 时返回实际结果。
+- 未提供 `resume_id` 时，当前实现返回空列表。
+
 ### UpdateInterviewStatus - 更新面试状态
 
 ```bash
@@ -109,6 +130,18 @@ grpcurl -plaintext -d '{
 - `cancelled` - 已取消
 
 ## FeedbackService 方法
+
+### GetFeedback - 按反馈 ID 获取面评
+
+```bash
+grpcurl -plaintext -d '{
+  "id": "<反馈UUID>"
+}' localhost:9091 interview.FeedbackService/GetFeedback
+```
+
+**说明:**
+- 该方法已在 proto 中定义。
+- 当前服务端实现返回 `Unimplemented`，因为 service 层没有按反馈 ID 查询的能力。
 
 ### CreateFeedback - 提交面试反馈
 
@@ -136,6 +169,18 @@ grpcurl -plaintext -d '{
 ```
 
 ## PortfolioService 方法
+
+### GetPortfolio - 获取单个作品集
+
+```bash
+grpcurl -plaintext -d '{
+  "id": "<作品集UUID>"
+}' localhost:9091 interview.PortfolioService/GetPortfolio
+```
+
+**说明:**
+- 该方法已在 proto 中定义。
+- 实际支持情况应以 `internal/interview/grpc/server.go` 为准。
 
 ### CreatePortfolio - 创建作品集
 
@@ -169,7 +214,7 @@ grpcurl -plaintext -d '{
 | `AlreadyExists` | 资源已存在 (如重复提交反馈) |
 | `FailedPrecondition` | 状态转换无效 |
 | `Internal` | 服务器内部错误 |
-| `Unimplemented` | 方法未实现 |
+| `Unimplemented` | proto 已定义但当前服务端未完整实现的方法 |
 
 ## Proto 文件位置
 

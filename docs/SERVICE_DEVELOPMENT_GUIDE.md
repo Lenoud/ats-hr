@@ -46,14 +46,21 @@
    └─────────┘      └─────────┘      └─────────┘
 ```
 
-### 双协议支持
+### 协议支持
 
-每个微服务同时支持 **HTTP REST** 和 **gRPC** 两种协议：
+平台默认优先提供 **HTTP REST**。是否同时提供 **gRPC** 取决于服务职责和当前实现阶段：
 
 | 协议 | 端口 | 用途 |
 |------|------|------|
 | HTTP | 808X | 对外 API、Web 前端调用 |
 | gRPC | 909X | 服务间同步调用 |
+
+当前仓库内的实际状态：
+
+- `resume-service`：HTTP + gRPC
+- `interview-service`：HTTP + gRPC
+- `search-service`：HTTP，暂未提供 gRPC 入口
+- `gateway`：HTTP，仅做首页、健康检查和反向代理
 
 ---
 
@@ -79,11 +86,11 @@ ats-platform/
 │   │   │   └── {name}_repository.go
 │   │   ├── model/                # 数据模型
 │   │   │   └── {name}.go
-│   │   └── grpc/                 # gRPC 服务端
+│   │   └── grpc/                 # gRPC 服务端 (按需提供)
 │   │       └── server.go
 │   │
 │   └── shared/                   # 共享模块
-│       ├── database/             # 数据库连接
+│       ├── database/             # PostgreSQL/Elasticsearch 连接
 │       ├── events/               # 事件发布/消费
 │       ├── llm/                  # LLM 客户端
 │       ├── logger/               # 日志
@@ -907,7 +914,7 @@ func (s *resumeService) Create(input CreateResumeInput) (*model.Resume, error) {
 - [ ] `internal/{domain}/repository/` - 数据访问层
 - [ ] `internal/{domain}/service/` - 业务逻辑层
 - [ ] `internal/{domain}/handler/` - HTTP 处理器
-- [ ] `internal/{domain}/grpc/` - gRPC 服务端
+- [ ] `internal/{domain}/grpc/` - gRPC 服务端（按需提供）
 - [ ] `proto/{domain}.proto` - Proto 定义
 
 ### 功能完整性
@@ -932,3 +939,19 @@ func (s *resumeService) Create(input CreateResumeInput) (*model.Resume, error) {
 - **实际实现**: `internal/resume/` 目录
 - **设计文档**: `docs/superpowers/specs/2026-03-20-ats-platform-design.md`
 - **Proto 定义**: `proto/resume.proto`
+
+---
+
+## 当前仓库补充说明
+
+### search-service
+
+- 当前实现包含 `handler -> service -> repository` 三层，以及 `cmd/search-service/main.go` 中的 Redis Stream consumer 启动逻辑。
+- `internal/search/repository/es_repository.go` 已实现 Elasticsearch 索引创建、搜索、删除和状态更新。
+- `search-service` 当前只提供 HTTP 接口：`GET /api/v1/search` 与 `POST /api/v1/search/advanced`。
+
+### gateway
+
+- 当前 `gateway` 实现集中在 `cmd/gateway/main.go`，没有单独的 `internal/gateway/` 领域目录。
+- 它提供首页、`/health` 聚合检查和 `/api/v1/*` 的路径前缀代理。
+- 当前代理目标服务地址仍为静态配置，不通过 Consul 做动态发现。
