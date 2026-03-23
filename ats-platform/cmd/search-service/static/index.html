@@ -6,124 +6,863 @@
     <title>ATS Search Service</title>
     <style>
         :root {
-            --bg: #f5efe2;
-            --panel: rgba(255, 252, 245, 0.92);
-            --ink: #1d2a33;
-            --muted: #5b6c74;
-            --accent: #b2552d;
-            --accent-2: #2f6f62;
-            --line: rgba(29, 42, 51, 0.12);
+            --bg-top: #e4ddcf;
+            --bg-bottom: #f5f2eb;
+            --paper: rgba(255, 252, 247, 0.92);
+            --panel: rgba(255, 255, 255, 0.82);
+            --ink: #1f2b2f;
+            --muted: #66767d;
+            --accent: #a7481f;
+            --accent-deep: #843113;
+            --teal: #1c655a;
+            --teal-deep: #124941;
+            --line: rgba(31, 43, 47, 0.12);
+            --shadow: 0 26px 60px rgba(58, 48, 32, 0.12);
+            --radius-xl: 26px;
+            --radius-lg: 18px;
+            --radius-md: 14px;
         }
-        * { box-sizing: border-box; }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             min-height: 100vh;
             font-family: Georgia, "Times New Roman", serif;
             color: var(--ink);
             background:
-                radial-gradient(circle at top left, rgba(178, 85, 45, 0.18), transparent 28%),
-                radial-gradient(circle at bottom right, rgba(47, 111, 98, 0.16), transparent 24%),
-                linear-gradient(135deg, #f3ebdb, #e7dfcf 55%, #efe8dc);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
+                radial-gradient(circle at 15% 10%, rgba(167, 72, 31, 0.16), transparent 24%),
+                radial-gradient(circle at 85% 15%, rgba(28, 101, 90, 0.14), transparent 18%),
+                radial-gradient(circle at 80% 85%, rgba(167, 72, 31, 0.1), transparent 22%),
+                linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+            padding: 22px;
         }
-        .card {
-            width: min(760px, 100%);
-            background: var(--panel);
+
+        .shell {
+            max-width: 1320px;
+            margin: 0 auto;
+            display: grid;
+            gap: 18px;
+        }
+
+        .hero {
+            background: var(--paper);
             border: 1px solid var(--line);
-            border-radius: 24px;
-            padding: 36px;
-            box-shadow: 0 28px 70px rgba(41, 36, 26, 0.16);
-            backdrop-filter: blur(12px);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            padding: 28px;
+            backdrop-filter: blur(10px);
         }
+
         .eyebrow {
-            letter-spacing: 0.18em;
             text-transform: uppercase;
+            letter-spacing: 0.18em;
             font-size: 12px;
             color: var(--accent);
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
+
         h1 {
-            margin: 0 0 12px;
-            font-size: clamp(32px, 5vw, 52px);
-            line-height: 1.05;
-        }
-        p {
             margin: 0;
+            font-size: clamp(34px, 5vw, 58px);
+            line-height: 1.02;
+        }
+
+        .hero p {
+            margin: 14px 0 0;
+            max-width: 760px;
             color: var(--muted);
             font-size: 18px;
-            line-height: 1.6;
+            line-height: 1.65;
         }
-        .grid {
-            margin-top: 28px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 14px;
-        }
-        .tile {
-            padding: 16px;
-            border-radius: 18px;
-            border: 1px solid var(--line);
-            background: rgba(255,255,255,0.65);
-        }
-        .tile strong {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: var(--ink);
-        }
-        .tile span {
-            color: var(--muted);
-            font-size: 15px;
-            line-height: 1.5;
-        }
-        .actions {
-            margin-top: 28px;
+
+        .topbar {
+            margin-top: 22px;
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
         }
-        a {
+
+        .pill {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 160px;
-            padding: 12px 18px;
+            gap: 8px;
+            padding: 10px 14px;
             border-radius: 999px;
             text-decoration: none;
-            color: white;
-            background: var(--accent);
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.75);
+            color: var(--ink);
+            font-size: 14px;
         }
-        a.secondary {
-            background: var(--accent-2);
+
+        .pill.primary {
+            background: var(--accent);
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1.05fr 1.35fr;
+            gap: 18px;
+        }
+
+        .panel {
+            background: var(--paper);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .panel-inner {
+            padding: 24px;
+        }
+
+        .section-title {
+            margin: 0 0 8px;
+            font-size: 22px;
+        }
+
+        .section-copy {
+            margin: 0 0 18px;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+        }
+
+        .card + .card {
+            margin-top: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        input,
+        textarea,
+        select,
+        button {
+            font: inherit;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            border: 1px solid rgba(31, 43, 47, 0.18);
+            background: rgba(255,255,255,0.92);
+            border-radius: 12px;
+            padding: 12px 13px;
+            color: var(--ink);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 190px;
+            line-height: 1.55;
+            font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+            font-size: 13px;
+        }
+
+        .actions {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            cursor: pointer;
+            transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button.primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        button.primary:hover {
+            background: var(--accent-deep);
+        }
+
+        button.secondary {
+            background: var(--teal);
+            color: white;
+        }
+
+        button.secondary:hover {
+            background: var(--teal-deep);
+        }
+
+        button.ghost {
+            background: rgba(255,255,255,0.8);
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+
+        .statusbar {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .metric {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 14px 16px;
+        }
+
+        .metric strong {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .metric span {
+            font-size: 22px;
+        }
+
+        .note {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: rgba(35, 95, 87, 0.08);
+            color: var(--teal-deep);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .result-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .result-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .resume-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 18px;
+        }
+
+        .console-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .resume-head {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .resume-name {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .resume-email {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0 12px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(177, 73, 35, 0.1);
+            color: var(--accent-deep);
+            font-size: 12px;
+            border: 1px solid rgba(177, 73, 35, 0.16);
+        }
+
+        .resume-meta {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .meta-block strong {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #192329;
+            color: #eef5f3;
+            border-radius: 18px;
+            padding: 16px;
+            font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.55;
+            min-height: 150px;
+        }
+
+        .empty {
+            padding: 24px;
+            border: 1px dashed rgba(31, 43, 47, 0.2);
+            border-radius: 18px;
+            color: var(--muted);
+            background: rgba(255,255,255,0.5);
+            text-align: center;
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1200;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            border-radius: 12px;
+            color: white;
+            font-size: 14px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toast.success { background: #4caf50; }
+        .toast.error { background: #f44336; }
+        .toast.info { background: #2196f3; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        @media (max-width: 1080px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            body {
+                padding: 14px;
+            }
+
+            .hero,
+            .panel-inner {
+                padding: 18px;
+            }
+
+            .grid,
+            .statusbar,
+            .resume-meta {
+                grid-template-columns: 1fr;
+            }
+
+            .resume-head,
+            .result-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
         }
     </style>
 </head>
 <body>
-    <main class="card">
-        <div class="eyebrow">ATS Platform</div>
-        <h1>Search Service</h1>
-        <p>负责简历全文检索、条件筛选，以及消费简历事件并同步 Elasticsearch 索引。</p>
-        <section class="grid">
-            <div class="tile">
-                <strong>HTTP API</strong>
-                <span>`GET /api/v1/search` 与 `POST /api/v1/search/advanced`</span>
-            </div>
-            <div class="tile">
-                <strong>Search Engine</strong>
-                <span>Elasticsearch 8.x 索引 `resumes`</span>
-            </div>
-            <div class="tile">
-                <strong>Event Sync</strong>
-                <span>消费 `resume:events`，同步创建、删除和状态更新</span>
+    <main class="shell">
+        <section class="hero">
+            <div class="eyebrow">ATS Platform</div>
+            <h1>Search Service Playground</h1>
+            <p>
+                直接在这个页面测试 <code>GET /api/v1/search</code> 和
+                <code>POST /api/v1/search/advanced</code>。你可以输入关键词、技能、状态和来源，
+                查看原始请求、响应结果以及渲染后的简历列表。
+            </p>
+            <div class="topbar">
+                <a class="pill primary" href="/health" target="_blank" rel="noreferrer">Health</a>
+                <a class="pill" href="/ready" target="_blank" rel="noreferrer">Ready</a>
+                <a class="pill" href="/api/v1/search" target="_blank" rel="noreferrer">Raw Search API</a>
             </div>
         </section>
-        <div class="actions">
-            <a href="/health">Health</a>
-            <a class="secondary" href="/ready">Ready</a>
-        </div>
+
+        <section class="layout">
+            <section class="panel">
+                <div class="panel-inner">
+                    <h2 class="section-title">Query Console</h2>
+                    <p class="section-copy">
+                        左侧用于构造请求，右侧展示搜索结果与原始 JSON。默认高级搜索 JSON 已内置示例。
+                    </p>
+
+                    <div class="card">
+                        <div class="console-toolbar">
+                            <h3 style="margin:0;">Quick Search</h3>
+                            <span class="hint">表单模式</span>
+                        </div>
+                        <div class="grid">
+                            <div>
+                                <label for="query">关键词</label>
+                                <input id="query" placeholder="例如：golang / backend / docker">
+                            </div>
+                            <div>
+                                <label for="skills">技能（逗号分隔）</label>
+                                <input id="skills" placeholder="go,docker,kubernetes">
+                            </div>
+                            <div>
+                                <label for="status">状态</label>
+                                <input id="status" placeholder="pending / parsed / archived">
+                            </div>
+                            <div>
+                                <label for="source">来源</label>
+                                <input id="source" placeholder="upload / linkedin / boss">
+                            </div>
+                            <div>
+                                <label for="min_exp">最小经验</label>
+                                <input id="min_exp" type="number" min="0" placeholder="0">
+                            </div>
+                            <div>
+                                <label for="max_exp">最大经验</label>
+                                <input id="max_exp" type="number" min="0" placeholder="10">
+                            </div>
+                            <div>
+                                <label for="page">页码</label>
+                                <input id="page" type="number" min="1" value="1">
+                            </div>
+                            <div>
+                                <label for="page_size">每页数量</label>
+                                <input id="page_size" type="number" min="1" max="100" value="10">
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="primary" id="runQuick">运行 GET 搜索</button>
+                            <button class="ghost" id="fillExample">填充示例</button>
+                            <button class="ghost" id="clearQuick">清空表单</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="console-toolbar">
+                            <h3 style="margin:0;">Advanced Search JSON</h3>
+                            <span class="hint">JSON 模式</span>
+                        </div>
+                        <div class="grid single">
+                            <div>
+                                <label for="advancedJson">POST /api/v1/search/advanced 请求体</label>
+                                <textarea id="advancedJson">{
+  "query": "golang",
+  "skills": ["go", "docker"],
+  "status": "",
+  "source": "",
+  "min_experience": 0,
+  "max_experience": 8,
+  "page": 1,
+  "page_size": 10
+}</textarea>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="secondary" id="runAdvanced">运行 POST 高级搜索</button>
+                            <button class="ghost" id="prettyJson">格式化 JSON</button>
+                        </div>
+                    </div>
+
+                    <div class="note" id="statusNote">
+                        等待发起请求。若结果为空，请先确认 Elasticsearch 已有索引数据，或 resume-service 事件已被 search-service 成功消费。
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-inner">
+                    <h2 class="section-title">Search Result Viewer</h2>
+                    <p class="section-copy">
+                        展示分页信息、渲染后的简历卡片，以及最近一次请求与响应原文，方便联调。
+                    </p>
+
+                    <div class="statusbar">
+                        <div class="metric">
+                            <strong>Total</strong>
+                            <span id="metricTotal">-</span>
+                        </div>
+                        <div class="metric">
+                            <strong>Page</strong>
+                            <span id="metricPage">-</span>
+                        </div>
+                        <div class="metric">
+                            <strong>Items</strong>
+                            <span id="metricItems">-</span>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top:14px;">
+                        <div class="result-toolbar">
+                            <strong>Rendered Results</strong>
+                            <span class="hint" id="requestMode">尚未执行请求</span>
+                        </div>
+                        <div class="result-list" id="resultList">
+                            <div class="empty">执行一次搜索后，结果会显示在这里。</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="result-toolbar">
+                            <strong>Last Request</strong>
+                            <span class="hint" id="requestPath">-</span>
+                        </div>
+                        <pre id="requestPreview">暂无请求</pre>
+                    </div>
+
+                    <div class="card">
+                        <div class="result-toolbar">
+                            <strong>Raw Response</strong>
+                            <span class="hint" id="responseStatus">-</span>
+                        </div>
+                        <pre id="responsePreview">暂无响应</pre>
+                    </div>
+                </div>
+            </section>
+        </section>
     </main>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const state = {
+            lastMode: "",
+        };
+
+        const $ = (id) => document.getElementById(id);
+
+        function showToast(message, type = "success") {
+            const container = $("toastContainer");
+            const toast = document.createElement("div");
+            toast.className = "toast " + type;
+            const icon = type === "success" ? "✓" : type === "error" ? "✗" : "ℹ";
+            toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = "slideOut 0.3s ease forwards";
+                setTimeout(() => toast.remove(), 300);
+            }, 2600);
+        }
+
+        function setNote(message, isError) {
+            const note = $("statusNote");
+            note.textContent = message;
+            note.style.background = isError
+                ? "rgba(177, 73, 35, 0.12)"
+                : "rgba(35, 95, 87, 0.08)";
+            note.style.color = isError ? "#8d3514" : "#17443f";
+        }
+
+        function setRequestPreview(path, payload) {
+            $("requestPath").textContent = path;
+            $("requestPreview").textContent = payload;
+        }
+
+        function setResponsePreview(status, payload) {
+            $("responseStatus").textContent = status;
+            $("responsePreview").textContent = payload;
+        }
+
+        function updateMetrics(pageData) {
+            $("metricTotal").textContent = pageData && typeof pageData.total !== "undefined" ? pageData.total : "-";
+            $("metricPage").textContent = pageData && typeof pageData.page !== "undefined" ? pageData.page : "-";
+            const count = pageData && Array.isArray(pageData.list) ? pageData.list.length : "-";
+            $("metricItems").textContent = count;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function renderResults(items) {
+            const container = $("resultList");
+            if (!Array.isArray(items) || items.length === 0) {
+                container.innerHTML = '<div class="empty">没有命中结果。你可以更换关键词，或先确认索引里已经有简历数据。</div>';
+                return;
+            }
+
+            container.innerHTML = items.map((item) => {
+                const skills = Array.isArray(item.skills) ? item.skills : [];
+                return `
+                    <article class="resume-card">
+                        <div class="resume-head">
+                            <div>
+                                <h3 class="resume-name">${escapeHtml(item.name || "Unnamed Resume")}</h3>
+                                <div class="resume-email">${escapeHtml(item.email || "No email")}</div>
+                            </div>
+                            <div class="badge-row">
+                                <span class="badge">ID: ${escapeHtml(item.resume_id || "-")}</span>
+                                <span class="badge">Status: ${escapeHtml(item.status || "-")}</span>
+                                <span class="badge">Source: ${escapeHtml(item.source || "-")}</span>
+                            </div>
+                        </div>
+
+                        <div class="badge-row">
+                            ${skills.length ? skills.map((skill) => `<span class="badge">${escapeHtml(skill)}</span>`).join("") : '<span class="badge">No skills</span>'}
+                        </div>
+
+                        <div class="resume-meta">
+                            <div class="meta-block">
+                                <strong>Experience Years</strong>
+                                <div>${escapeHtml(item.experience_years ?? 0)}</div>
+                            </div>
+                            <div class="meta-block">
+                                <strong>Education</strong>
+                                <div>${escapeHtml(item.education || "-")}</div>
+                            </div>
+                            <div class="meta-block">
+                                <strong>Work History</strong>
+                                <div>${escapeHtml(item.work_history || "-")}</div>
+                            </div>
+                            <div class="meta-block">
+                                <strong>Timestamps</strong>
+                                <div>Created: ${escapeHtml(item.created_at || "-")}<br>Updated: ${escapeHtml(item.updated_at || "-")}</div>
+                            </div>
+                        </div>
+                    </article>
+                `;
+            }).join("");
+        }
+
+        function buildQuickQuery() {
+            const params = new URLSearchParams();
+
+            const appendIfPresent = (key, value) => {
+                if (value !== "" && value !== null && typeof value !== "undefined") {
+                    params.set(key, value);
+                }
+            };
+
+            appendIfPresent("query", $("query").value.trim());
+            appendIfPresent("skills", $("skills").value.trim());
+            appendIfPresent("status", $("status").value.trim());
+            appendIfPresent("source", $("source").value.trim());
+            appendIfPresent("min_exp", $("min_exp").value.trim());
+            appendIfPresent("max_exp", $("max_exp").value.trim());
+            appendIfPresent("page", $("page").value.trim() || "1");
+            appendIfPresent("page_size", $("page_size").value.trim() || "10");
+
+            return params;
+        }
+
+        async function runQuickSearch() {
+            state.lastMode = "GET /api/v1/search";
+            $("requestMode").textContent = state.lastMode;
+
+            const params = buildQuickQuery();
+            const path = `/api/v1/search${params.toString() ? `?${params.toString()}` : ""}`;
+            setRequestPreview(path, path);
+            setNote("正在请求搜索接口...", false);
+            showToast("正在执行 GET 搜索", "info");
+
+            try {
+                const response = await fetch(path);
+                const text = await response.text();
+                let data;
+
+                try {
+                    data = JSON.parse(text);
+                    setResponsePreview(`${response.status} ${response.statusText}`, JSON.stringify(data, null, 2));
+                } catch (err) {
+                    setResponsePreview(`${response.status} ${response.statusText}`, text);
+                    throw new Error("响应不是有效 JSON");
+                }
+
+                handleResponseData(response, data);
+            } catch (error) {
+                updateMetrics(null);
+                renderResults([]);
+                setNote(`请求失败：${error.message}`, true);
+                showToast(`请求失败：${error.message}`, "error");
+            }
+        }
+
+        async function runAdvancedSearch() {
+            state.lastMode = "POST /api/v1/search/advanced";
+            $("requestMode").textContent = state.lastMode;
+
+            const raw = $("advancedJson").value.trim();
+            let payload;
+            try {
+                payload = JSON.parse(raw);
+            } catch (error) {
+                setNote(`高级搜索 JSON 格式错误：${error.message}`, true);
+                showToast(`JSON 格式错误：${error.message}`, "error");
+                return;
+            }
+
+            setRequestPreview("/api/v1/search/advanced", JSON.stringify(payload, null, 2));
+            setNote("正在请求高级搜索接口...", false);
+            showToast("正在执行 POST 高级搜索", "info");
+
+            try {
+                const response = await fetch("/api/v1/search/advanced", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const text = await response.text();
+                let data;
+
+                try {
+                    data = JSON.parse(text);
+                    setResponsePreview(`${response.status} ${response.statusText}`, JSON.stringify(data, null, 2));
+                } catch (err) {
+                    setResponsePreview(`${response.status} ${response.statusText}`, text);
+                    throw new Error("响应不是有效 JSON");
+                }
+
+                handleResponseData(response, data);
+            } catch (error) {
+                updateMetrics(null);
+                renderResults([]);
+                setNote(`请求失败：${error.message}`, true);
+                showToast(`请求失败：${error.message}`, "error");
+            }
+        }
+
+        function handleResponseData(response, data) {
+            if (!response.ok) {
+                updateMetrics(null);
+                renderResults([]);
+                setNote(`接口返回错误：${data && data.message ? data.message : response.statusText}`, true);
+                showToast(data && data.message ? data.message : response.statusText, "error");
+                return;
+            }
+
+            const pageData = data && data.data ? data.data : null;
+            updateMetrics(pageData);
+            renderResults(pageData && pageData.list ? pageData.list : []);
+
+            const total = pageData && typeof pageData.total !== "undefined" ? pageData.total : 0;
+            setNote(`请求成功，当前命中 ${total} 条结果。`, false);
+            showToast(`请求成功，命中 ${total} 条结果`, "success");
+        }
+
+        function fillExample() {
+            $("query").value = "golang";
+            $("skills").value = "go,docker";
+            $("status").value = "";
+            $("source").value = "";
+            $("min_exp").value = "0";
+            $("max_exp").value = "8";
+            $("page").value = "1";
+            $("page_size").value = "10";
+            setNote("已填充示例参数，你可以直接运行 GET 搜索。", false);
+            showToast("已填充示例参数", "info");
+        }
+
+        function clearQuick() {
+            ["query", "skills", "status", "source", "min_exp", "max_exp"].forEach((id) => {
+                $(id).value = "";
+            });
+            $("page").value = "1";
+            $("page_size").value = "10";
+            setNote("快速搜索表单已清空。", false);
+            showToast("已清空快速搜索表单", "info");
+        }
+
+        function prettyJson() {
+            try {
+                const parsed = JSON.parse($("advancedJson").value);
+                $("advancedJson").value = JSON.stringify(parsed, null, 2);
+                setNote("高级搜索 JSON 已格式化。", false);
+                showToast("高级搜索 JSON 已格式化", "success");
+            } catch (error) {
+                setNote(`JSON 格式错误：${error.message}`, true);
+                showToast(`JSON 格式错误：${error.message}`, "error");
+            }
+        }
+
+        $("runQuick").addEventListener("click", runQuickSearch);
+        $("runAdvanced").addEventListener("click", runAdvancedSearch);
+        $("fillExample").addEventListener("click", fillExample);
+        $("clearQuick").addEventListener("click", clearQuick);
+        $("prettyJson").addEventListener("click", prettyJson);
+
+        fillExample();
+    </script>
 </body>
 </html>
