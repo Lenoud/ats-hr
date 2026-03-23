@@ -955,3 +955,9 @@ func (s *resumeService) Create(input CreateResumeInput) (*model.Resume, error) {
 - 当前 `gateway` 实现集中在 `cmd/gateway/main.go`，没有单独的 `internal/gateway/` 领域目录。
 - 它提供首页、`/health` 聚合检查和 `/api/v1/*` 的路径前缀代理。
 - 当前代理目标服务地址仍为静态配置，不通过 Consul 做动态发现。
+
+### 本地开发启动约定
+
+- 多服务联调统一使用 `ats-platform/scripts/run-services.sh`。
+- `Makefile` 中的 `run-all`、`run-all-no-infra`、`run-all-with-gateway`、`build-services` 都只作为该脚本的薄包装入口。
+- 单服务调试仍然使用 `run-resume`、`run-interview`、`run-search`、`run-gateway`。

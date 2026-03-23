@@ -26,6 +26,7 @@ Optionally starts docker-compose infrastructure first.
 Options:
   --no-infra     Do not start docker-compose dependencies
   --build-only   Only build the three binaries, do not run them
+  --gateway      Also build and run the API gateway
   -h, --help     Show this help
 EOF
 }
@@ -63,6 +64,9 @@ while (($# > 0)); do
       ;;
     --build-only)
       BUILD_ONLY=1
+      ;;
+    --gateway)
+      SERVICES+=("gateway:./cmd/gateway:gateway")
       ;;
     -h|--help)
       usage

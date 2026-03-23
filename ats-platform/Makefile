@@ -1,4 +1,4 @@
-.PHONY: infra-up infra-down proto migrate-up test run-gateway run-resume run-interview run-search run-all clean
+.PHONY: infra-up infra-down proto migrate-up test run-gateway run-resume run-interview run-search run-all run-all-no-infra run-all-with-gateway build-services clean
 
 # Infrastructure
 infra-up:
@@ -32,11 +32,16 @@ run-search:
 	go run ./cmd/search-service
 
 run-all:
-	@echo "Starting all services..."
-	@go run ./cmd/resume-service &
-	@go run ./cmd/interview-service &
-	@go run ./cmd/search-service &
-	@go run ./cmd/gateway
+	./scripts/run-services.sh
+
+run-all-no-infra:
+	./scripts/run-services.sh --no-infra
+
+run-all-with-gateway:
+	./scripts/run-services.sh --gateway
+
+build-services:
+	./scripts/run-services.sh --build-only
 
 # Development
 test:
