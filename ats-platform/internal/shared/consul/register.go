@@ -34,12 +34,17 @@ func GetOutboundIP() (net.IP, error) {
 	return localAddr.IP, nil
 }
 
-// RegisterService 将gRPC服务注册到consul
+// ServiceID returns the stable Consul service ID used by this helper.
+func ServiceID(serviceName string, ip string, port int, uuid string) string {
+	return fmt.Sprintf("%s-%s-%d-%s", serviceName, ip, port, uuid)
+}
+
+// RegisterService registers a service endpoint in Consul.
 func (c *consul) RegisterService(serviceName string, ip string, port int, uuid string) error {
 	srv := &api.AgentServiceRegistration{
-		ID:      fmt.Sprintf("%s-%s-%d-%s", serviceName, ip, port, uuid), // 服务唯一ID
-		Name:    serviceName,                                             // 服务名称
-		Tags:    []string{"grpc", "http"},                                // 为服务打标签
+		ID:      ServiceID(serviceName, ip, port, uuid),
+		Name:    serviceName,
+		Tags:    []string{"tcp"},
 		Address: ip,
 		Port:    port,
 

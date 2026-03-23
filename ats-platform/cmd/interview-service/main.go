@@ -136,14 +136,21 @@ func main() {
 		log.Fatalf("GetOutboundIP failed: %v", err)
 	}
 	ip := ipObj.String()
-
+	httpPort, _ := strconv.Atoi(cfg.HTTPPort)
 	grpcPort, _ := strconv.Atoi(cfg.GRPCPort)
-	uuid := uuid.NewString()
-	serviceId := fmt.Sprintf("%s-%s-%d-%s", cfg.ServiceName, ip, grpcPort, uuid)
-	if err := consulClient.RegisterService(cfg.ServiceName, ip, grpcPort, uuid); err != nil {
-		log.Fatalf("RegisterService failed: %v", err)
+	instanceUUID := uuid.NewString()
+	httpServiceName := cfg.ServiceName + "-http"
+	grpcServiceName := cfg.ServiceName + "-grpc"
+	httpServiceID := consul.ServiceID(httpServiceName, ip, httpPort, instanceUUID)
+	grpcServiceID := consul.ServiceID(grpcServiceName, ip, grpcPort, instanceUUID)
+	if err := consulClient.RegisterService(httpServiceName, ip, httpPort, instanceUUID); err != nil {
+		log.Fatalf("RegisterService http failed: %v", err)
 	}
-	fmt.Println("✅ Registered service to Consul with ID:", serviceId)
+	if err := consulClient.RegisterService(grpcServiceName, ip, grpcPort, instanceUUID); err != nil {
+		log.Fatalf("RegisterService grpc failed: %v", err)
+	}
+	fmt.Println("✅ Registered HTTP service to Consul with ID:", httpServiceID)
+	fmt.Println("✅ Registered gRPC service to Consul with ID:", grpcServiceID)
 
 	// Initialize layered architecture
 	interviewRepo := repository.NewInterviewRepository(postgresClient.GetDB())
@@ -279,10 +286,15 @@ func main() {
 	}
 
 	// 4. Consul反注册服务
-	if err := consulClient.Deregister(serviceId); err != nil {
-		log.Printf("❌ Consul反注册失败: %v", err)
+	if err := consulClient.Deregister(httpServiceID); err != nil {
+		log.Printf("❌ Consul HTTP反注册失败: %v", err)
 	} else {
-		fmt.Println("✅ 服务已从Consul注销")
+		fmt.Println("✅ HTTP服务已从Consul注销")
+	}
+	if err := consulClient.Deregister(grpcServiceID); err != nil {
+		log.Printf("❌ Consul gRPC反注册失败: %v", err)
+	} else {
+		fmt.Println("✅ gRPC服务已从Consul注销")
 	}
 
 	// 5. Close Redis

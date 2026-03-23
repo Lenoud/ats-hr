@@ -29,15 +29,15 @@ var routeTargets = []struct {
 }{
 	{
 		Prefix: "/resumes",
-		Target: routeTarget{ServiceKey: "resume", ServiceName: "resume-service"},
+		Target: routeTarget{ServiceKey: "resume", ServiceName: "resume-service-http"},
 	},
 	{
 		Prefix: "/interviews",
-		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service"},
+		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service-http"},
 	},
 	{
 		Prefix: "/portfolios",
-		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service"},
+		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service-http"},
 	},
 	{
 		Prefix: "/search",
@@ -160,8 +160,8 @@ func main() {
 	})
 
 	r.GET("/", func(c *gin.Context) {
-		resumeURL := discoverServiceURL(discovery, "resume-service")
-		interviewURL := discoverServiceURL(discovery, "interview-service")
+		resumeURL := discoverServiceURL(discovery, "resume-service-http")
+		interviewURL := discoverServiceURL(discovery, "interview-service-http")
 		searchURL := discoverServiceURL(discovery, "search-service")
 
 		c.Header("Content-Type", "text/html; charset=utf-8")
@@ -173,8 +173,8 @@ func main() {
 			"service": "api-gateway",
 			"status":  "ok",
 			"services": gin.H{
-				"resume":    checkServiceStatus(discovery, "resume-service"),
-				"interview": checkServiceStatus(discovery, "interview-service"),
+				"resume":    checkServiceStatus(discovery, "resume-service-http"),
+				"interview": checkServiceStatus(discovery, "interview-service-http"),
 				"search":    checkServiceStatus(discovery, "search-service"),
 			},
 			"time": time.Now().Format(time.RFC3339),
