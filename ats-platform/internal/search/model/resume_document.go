@@ -4,17 +4,17 @@ import "time"
 
 // ResumeDocument represents a resume document stored in Elasticsearch
 type ResumeDocument struct {
-	ResumeID       string    `json:"resume_id"`
-	Name           string    `json:"name"`
-	Email          string    `json:"email"`
-	Skills         []string  `json:"skills"`
-	ExperienceYears int      `json:"experience_years"`
-	Education      string    `json:"education"`
-	WorkHistory    string    `json:"work_history"`
-	Status         string    `json:"status"`
-	Source         string    `json:"source"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ResumeID        string    `json:"resume_id"`
+	Name            string    `json:"name"`
+	Email           string    `json:"email"`
+	Skills          []string  `json:"skills"`
+	ExperienceYears int       `json:"experience_years"`
+	Education       string    `json:"education"`
+	WorkHistory     string    `json:"work_history"`
+	Status          string    `json:"status"`
+	Source          string    `json:"source"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // IndexName returns the Elasticsearch index name for resume documents
@@ -42,16 +42,16 @@ func NewResumeDocument(
 	updatedAt time.Time,
 ) *ResumeDocument {
 	return &ResumeDocument{
-		ResumeID:       resumeID,
-		Name:           name,
-		Email:          email,
-		Skills:         skills,
+		ResumeID:        resumeID,
+		Name:            name,
+		Email:           email,
+		Skills:          skills,
 		ExperienceYears: experienceYears,
-		Education:      education,
-		WorkHistory:    workHistory,
-		Status:         status,
-		Source:         source,
-		CreatedAt:      createdAt,
-		UpdatedAt:      updatedAt,
+		Education:       education,
+		WorkHistory:     workHistory,
+		Status:          status,
+		Source:          source,
+		CreatedAt:       createdAt,
+		UpdatedAt:       updatedAt,
 	}
 }

@@ -16,7 +16,7 @@ dist/
 /search-service
 /interview-service
 /resume-service
-
+.gocache
 
 # Test coverage (测试覆盖率)
 *.out
