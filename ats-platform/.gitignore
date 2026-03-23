@@ -12,6 +12,11 @@ dist/
 /cmd/interview-service/interview-service
 /cmd/search-service/search-service
 /cmd/gateway/gateway
+/gateway
+/search-service
+/interview-service
+/resume-service
+
 
 # Test coverage (测试覆盖率)
 *.out
