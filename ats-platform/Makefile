@@ -16,7 +16,7 @@ migrate-up:
 
 # Protobuf
 proto:
-	protoc --go_out=. --go-grpc_out=. proto/*.proto
+	protoc --go_out=. --go_opt=module=github.com/example/ats-platform --go-grpc_out=. --go-grpc_opt=module=github.com/example/ats-platform proto/*.proto
 
 # Services
 run-gateway:

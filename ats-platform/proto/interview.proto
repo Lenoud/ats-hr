@@ -51,14 +51,6 @@ message CreateInterviewRequest {
   int64 scheduled_at = 4;
 }
 
-// UpdateInterviewRequest
-message UpdateInterviewRequest {
-  string id = 1;
-  int32 round = 2;
-  string interviewer = 3;
-  int64 scheduled_at = 4;
-}
-
 // UpdateInterviewStatusRequest
 message UpdateInterviewStatusRequest {
   string id = 1;
@@ -79,11 +71,6 @@ message ListInterviewsResponse {
   int64 total = 2;
 }
 
-// GetFeedbackRequest
-message GetFeedbackRequest {
-  string id = 1;
-}
-
 // GetFeedbackByInterviewRequest
 message GetFeedbackByInterviewRequest {
   string interview_id = 1;
@@ -97,14 +84,6 @@ message CreateFeedbackRequest {
   string recommendation = 4;
 }
 
-// UpdateFeedbackRequest
-message UpdateFeedbackRequest {
-  string id = 1;
-  int32 rating = 2;
-  string content = 3;
-  string recommendation = 4;
-}
-
 // GetPortfolioRequest
 message GetPortfolioRequest {
   string id = 1;
@@ -113,14 +92,6 @@ message GetPortfolioRequest {
 // CreatePortfolioRequest
 message CreatePortfolioRequest {
   string resume_id = 1;
-  string title = 2;
-  string file_url = 3;
-  string file_type = 4;
-}
-
-// UpdatePortfolioRequest
-message UpdatePortfolioRequest {
-  string id = 1;
   string title = 2;
   string file_url = 3;
   string file_type = 4;
@@ -143,23 +114,19 @@ message ListPortfoliosResponse {
 service InterviewService {
   rpc GetInterview(GetInterviewRequest) returns (Interview);
   rpc CreateInterview(CreateInterviewRequest) returns (Interview);
-  rpc UpdateInterview(UpdateInterviewRequest) returns (Interview);
   rpc UpdateInterviewStatus(UpdateInterviewStatusRequest) returns (Interview);
   rpc ListInterviews(ListInterviewsRequest) returns (ListInterviewsResponse);
 }
 
 // FeedbackService provides gRPC methods for feedback management
 service FeedbackService {
-  rpc GetFeedback(GetFeedbackRequest) returns (Feedback);
   rpc GetFeedbackByInterview(GetFeedbackByInterviewRequest) returns (Feedback);
   rpc CreateFeedback(CreateFeedbackRequest) returns (Feedback);
-  rpc UpdateFeedback(UpdateFeedbackRequest) returns (Feedback);
 }
 
 // PortfolioService provides gRPC methods for portfolio management
 service PortfolioService {
   rpc GetPortfolio(GetPortfolioRequest) returns (Portfolio);
   rpc CreatePortfolio(CreatePortfolioRequest) returns (Portfolio);
-  rpc UpdatePortfolio(UpdatePortfolioRequest) returns (Portfolio);
   rpc ListPortfolios(ListPortfoliosRequest) returns (ListPortfoliosResponse);
 }

@@ -64,37 +64,6 @@ func (s *InterviewServiceServer) CreateInterview(ctx context.Context, req *inter
 	return interviewToProto(i), nil
 }
 
-func (s *InterviewServiceServer) UpdateInterview(ctx context.Context, req *interview.UpdateInterviewRequest) (*interview.Interview, error) {
-	id, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
-	}
-
-	// Get existing interview first
-	existing, err := s.svc.GetByID(ctx, id)
-	if err != nil {
-		if err == service.ErrInterviewNotFound {
-			return nil, status.Errorf(codes.NotFound, "interview not found")
-		}
-		return nil, status.Errorf(codes.Internal, "get interview failed: %v", err)
-	}
-
-	// Update fields that are set (non-zero values)
-	if req.GetRound() > 0 {
-		existing.Round = int(req.GetRound())
-	}
-	if req.GetInterviewer() != "" {
-		existing.Interviewer = req.GetInterviewer()
-	}
-	if req.GetScheduledAt() > 0 {
-		existing.ScheduledAt = time.Unix(req.GetScheduledAt(), 0)
-	}
-
-	// Note: The service layer would need an Update method for full update support
-	// For now, return the updated model representation
-	return interviewToProto(existing), nil
-}
-
 func (s *InterviewServiceServer) UpdateInterviewStatus(ctx context.Context, req *interview.UpdateInterviewStatusRequest) (*interview.Interview, error) {
 	id, err := uuid.Parse(req.GetId())
 	if err != nil {
@@ -207,17 +176,6 @@ func NewFeedbackServiceServer(svc service.FeedbackService) *FeedbackServiceServe
 	return &FeedbackServiceServer{svc: svc}
 }
 
-func (s *FeedbackServiceServer) GetFeedback(ctx context.Context, req *interview.GetFeedbackRequest) (*interview.Feedback, error) {
-	_, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
-	}
-
-	// The service doesn't have GetByID, so we can't implement this directly
-	// Return not implemented for now
-	return nil, status.Errorf(codes.Unimplemented, "GetFeedback by ID is not implemented")
-}
-
 func (s *FeedbackServiceServer) GetFeedbackByInterview(ctx context.Context, req *interview.GetFeedbackByInterviewRequest) (*interview.Feedback, error) {
 	interviewID, err := uuid.Parse(req.GetInterviewId())
 	if err != nil {
@@ -264,12 +222,6 @@ func (s *FeedbackServiceServer) CreateFeedback(ctx context.Context, req *intervi
 	}
 
 	return feedbackToProto(f), nil
-}
-
-func (s *FeedbackServiceServer) UpdateFeedback(ctx context.Context, req *interview.UpdateFeedbackRequest) (*interview.Feedback, error) {
-	// The service doesn't have an Update method
-	// Return not implemented for now
-	return nil, status.Errorf(codes.Unimplemented, "UpdateFeedback is not implemented")
 }
 
 // PortfolioServiceServer implements the PortfolioService gRPC server
@@ -322,37 +274,6 @@ func (s *PortfolioServiceServer) CreatePortfolio(ctx context.Context, req *inter
 	}
 
 	return portfolioToProto(p), nil
-}
-
-func (s *PortfolioServiceServer) UpdatePortfolio(ctx context.Context, req *interview.UpdatePortfolioRequest) (*interview.Portfolio, error) {
-	id, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
-	}
-
-	// Get existing portfolio first
-	existing, err := s.svc.GetByID(ctx, id)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "portfolio not found")
-	}
-
-	// Update fields that are set (non-empty values)
-	if req.GetTitle() != "" {
-		existing.Title = req.GetTitle()
-	}
-	if req.GetFileUrl() != "" {
-		existing.FileURL = req.GetFileUrl()
-	}
-	if req.GetFileType() != "" {
-		if !isValidFileType(req.GetFileType()) {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid file type")
-		}
-		existing.FileType = req.GetFileType()
-	}
-
-	// Note: The service layer would need an Update method for full update support
-	// For now, return the updated model representation
-	return portfolioToProto(existing), nil
 }
 
 func (s *PortfolioServiceServer) ListPortfolios(ctx context.Context, req *interview.ListPortfoliosRequest) (*interview.ListPortfoliosResponse, error) {
