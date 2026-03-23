@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	sharedconsul "github.com/example/ats-platform/internal/shared/consul"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,8 +20,9 @@ type config struct {
 }
 
 type routeTarget struct {
-	ServiceKey  string
-	ServiceName string
+	ServiceKey      string
+	BaseServiceName string
+	Protocol        sharedconsul.Protocol
 }
 
 var routeTargets = []struct {
@@ -29,19 +31,35 @@ var routeTargets = []struct {
 }{
 	{
 		Prefix: "/resumes",
-		Target: routeTarget{ServiceKey: "resume", ServiceName: "resume-service-http"},
+		Target: routeTarget{
+			ServiceKey:      "resume",
+			BaseServiceName: sharedconsul.ResumeServiceBaseName,
+			Protocol:        sharedconsul.ProtocolHTTP,
+		},
 	},
 	{
 		Prefix: "/interviews",
-		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service-http"},
+		Target: routeTarget{
+			ServiceKey:      "interview",
+			BaseServiceName: sharedconsul.InterviewServiceBaseName,
+			Protocol:        sharedconsul.ProtocolHTTP,
+		},
 	},
 	{
 		Prefix: "/portfolios",
-		Target: routeTarget{ServiceKey: "interview", ServiceName: "interview-service-http"},
+		Target: routeTarget{
+			ServiceKey:      "interview",
+			BaseServiceName: sharedconsul.InterviewServiceBaseName,
+			Protocol:        sharedconsul.ProtocolHTTP,
+		},
 	},
 	{
 		Prefix: "/search",
-		Target: routeTarget{ServiceKey: "search", ServiceName: "search-service-http"},
+		Target: routeTarget{
+			ServiceKey:      "search",
+			BaseServiceName: sharedconsul.SearchServiceBaseName,
+			Protocol:        sharedconsul.ProtocolHTTP,
+		},
 	},
 }
 
@@ -160,9 +178,9 @@ func main() {
 	})
 
 	r.GET("/", func(c *gin.Context) {
-		resumeURL := discoverServiceURL(discovery, "resume-service-http")
-		interviewURL := discoverServiceURL(discovery, "interview-service-http")
-		searchURL := discoverServiceURL(discovery, "search-service-http")
+		resumeURL := discoverServiceURL(discovery, sharedconsul.ResumeServiceBaseName, sharedconsul.ProtocolHTTP)
+		interviewURL := discoverServiceURL(discovery, sharedconsul.InterviewServiceBaseName, sharedconsul.ProtocolHTTP)
+		searchURL := discoverServiceURL(discovery, sharedconsul.SearchServiceBaseName, sharedconsul.ProtocolHTTP)
 
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.String(http.StatusOK, fmt.Sprintf(indexHTMLTemplate, resumeURL, interviewURL, searchURL))
@@ -173,9 +191,9 @@ func main() {
 			"service": "api-gateway",
 			"status":  "ok",
 			"services": gin.H{
-				"resume":    checkServiceStatus(discovery, "resume-service-http"),
-				"interview": checkServiceStatus(discovery, "interview-service-http"),
-				"search":    checkServiceStatus(discovery, "search-service-http"),
+				"resume":    checkServiceStatus(discovery, sharedconsul.ResumeServiceBaseName, sharedconsul.ProtocolHTTP),
+				"interview": checkServiceStatus(discovery, sharedconsul.InterviewServiceBaseName, sharedconsul.ProtocolHTTP),
+				"search":    checkServiceStatus(discovery, sharedconsul.SearchServiceBaseName, sharedconsul.ProtocolHTTP),
 			},
 			"time": time.Now().Format(time.RFC3339),
 		})
@@ -192,16 +210,16 @@ func main() {
 	}
 }
 
-func discoverServiceURL(discovery *serviceDiscovery, serviceName string) string {
-	instance, err := discovery.resolve(serviceName)
+func discoverServiceURL(discovery *serviceDiscovery, baseName string, protocol sharedconsul.Protocol) string {
+	instance, err := discovery.resolve(baseName, protocol)
 	if err != nil {
 		return "#"
 	}
 	return instance.externalURL()
 }
 
-func checkServiceStatus(discovery *serviceDiscovery, serviceName string) gin.H {
-	instance, err := discovery.resolve(serviceName)
+func checkServiceStatus(discovery *serviceDiscovery, baseName string, protocol sharedconsul.Protocol) gin.H {
+	instance, err := discovery.resolve(baseName, protocol)
 	if err != nil {
 		return gin.H{
 			"status": "error",
@@ -252,11 +270,12 @@ func proxyHandler(c *gin.Context, discovery *serviceDiscovery) {
 		return
 	}
 
-	instance, err := discovery.resolve(target.ServiceName)
+	serviceName := sharedconsul.ServiceName(target.BaseServiceName, target.Protocol)
+	instance, err := discovery.resolve(target.BaseServiceName, target.Protocol)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error":   "service discovery failed",
-			"service": target.ServiceName,
+			"service": serviceName,
 			"detail":  err.Error(),
 		})
 		return
@@ -271,7 +290,7 @@ func proxyHandler(c *gin.Context, discovery *serviceDiscovery) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "failed to create upstream request",
-			"service": target.ServiceName,
+			"service": serviceName,
 			"detail":  err.Error(),
 		})
 		return
@@ -288,7 +307,7 @@ func proxyHandler(c *gin.Context, discovery *serviceDiscovery) {
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error":    "upstream request failed",
-			"service":  target.ServiceName,
+			"service":  serviceName,
 			"upstream": instance.baseURL(),
 			"detail":   err.Error(),
 		})
@@ -306,7 +325,7 @@ func proxyHandler(c *gin.Context, discovery *serviceDiscovery) {
 	if _, err := io.Copy(c.Writer, resp.Body); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error":    "failed to stream upstream response",
-			"service":  target.ServiceName,
+			"service":  serviceName,
 			"upstream": instance.baseURL(),
 			"detail":   err.Error(),
 		})

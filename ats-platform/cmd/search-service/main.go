@@ -50,6 +50,7 @@ type Config struct {
 	RedisGroup      string
 	RedisConsumer   string
 	ConsumerEnabled bool
+	ServiceAddress  string
 }
 
 func loadConfig() *Config {
@@ -74,6 +75,7 @@ func loadConfig() *Config {
 		RedisGroup:      getEnv("REDIS_GROUP", "search-service"),
 		RedisConsumer:   getEnv("REDIS_CONSUMER", fmt.Sprintf("%s-%s", serviceName, uuid.NewString())),
 		ConsumerEnabled: getEnv("REDIS_CONSUMER_ENABLED", "true") != "false",
+		ServiceAddress:  getEnv("SERVICE_ADDRESS", ""),
 	}
 }
 
@@ -155,16 +157,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("new consul client failed: %v", err)
 	}
-	ipObj, err := consul.GetOutboundIP()
+	ip, err := consul.ResolveServiceAddress(cfg.ServiceAddress)
 	if err != nil {
-		log.Fatalf("get outbound ip failed: %v", err)
+		log.Fatalf("resolve service address failed: %v", err)
 	}
-	ip := ipObj.String()
 	httpPort, _ := strconv.Atoi(cfg.HTTPPort)
 	instanceUUID := uuid.NewString()
-	httpServiceName := cfg.ServiceName + "-http"
-	serviceID := consul.ServiceID(httpServiceName, ip, httpPort, instanceUUID)
-	if err := consulClient.RegisterService(httpServiceName, ip, httpPort, instanceUUID); err != nil {
+	httpEndpoint := consul.Endpoint{
+		BaseName: consul.SearchServiceBaseName,
+		Protocol: consul.ProtocolHTTP,
+		IP:       ip,
+		Port:     httpPort,
+	}
+	serviceID := consul.EndpointServiceID(httpEndpoint, instanceUUID)
+	if err := consulClient.RegisterEndpoint(httpEndpoint, instanceUUID); err != nil {
 		log.Fatalf("register service failed: %v", err)
 	}
 	logger.Infof("Registered HTTP service to Consul with ID: %s", serviceID)

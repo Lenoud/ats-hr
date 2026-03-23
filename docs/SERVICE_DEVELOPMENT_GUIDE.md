@@ -11,6 +11,7 @@
 - [代码模板](#代码模板)
 - [命名约定](#命名约定)
 - [最佳实践](#最佳实践)
+- [服务注册与发现](#服务注册与发现)
 
 ---
 
@@ -61,6 +62,31 @@
 - `interview-service`：HTTP + gRPC
 - `search-service`：HTTP，暂未提供 gRPC 入口
 - `gateway`：HTTP，仅做首页、健康检查和反向代理
+
+### 服务注册与发现
+
+当前服务注册与发现约定统一收敛在 `ats-platform/internal/shared/consul/`：
+
+- 逻辑服务名：
+  - `resume-service`
+  - `interview-service`
+  - `search-service`
+- 协议枚举：
+  - `http`
+  - `grpc`
+- 最终 Consul service name 统一通过 `consul.ServiceName(baseName, protocol)` 生成
+
+推荐约定：
+
+- 服务端在 `main.go` 中声明 `consul.Endpoint`，再调用 `RegisterEndpoint(...)`
+- gateway 只依赖“逻辑服务名 + 协议”，不要在运行逻辑中硬编码 `resume-service-http` 这类最终 discover name
+- `search-service` 当前只注册 HTTP endpoint，不补 gRPC 协议对称实现
+
+本地开发补充：
+
+- 当 Consul 跑在 Docker、服务跑在宿主机时，可设置 `SERVICE_ADDRESS=host.docker.internal`
+- 未设置 `SERVICE_ADDRESS` 时，服务会回退到自动探测的出口 IP
+- gateway 在宿主机本地开发场景下，如果从 Consul 解析到 `host.docker.internal` 且本机不可解析，会回落到 `127.0.0.1`
 
 ---
 

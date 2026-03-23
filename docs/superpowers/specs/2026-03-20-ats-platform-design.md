@@ -40,7 +40,7 @@
 │  Resume Service │    │ Interview Svc   │    │  Search Service │
 │  (简历服务)      │    │  (面试流程服务)  │    │  (搜索服务)      │
 │  HTTP: 8081     │    │  HTTP: 8082     │    │  HTTP: 8083     │
-│  gRPC: 9090     │    │  gRPC: 9091     │    │  gRPC: 9092     │
+│  gRPC: 9090     │    │  gRPC: 9091     │    │  gRPC: -        │
 └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
          │                      │                      │
          │    ┌─────────────────┴─────────────────┐    │
@@ -166,8 +166,32 @@ ats-platform/internal/shared/
 
 - `resume-service` 同时提供 HTTP 和 gRPC，负责简历主数据、文件上传、解析和事件发布。
 - `interview-service` 同时提供 HTTP 和 gRPC，覆盖面试、面评和作品集管理。
-- `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过共享事件契约消费 `resume:events` 并将简历索引到 Elasticsearch，并在 Consul 中注册为 `search-service-http`。
-- `gateway` 当前是轻量级路径代理，按路径前缀决定目标服务，并通过 Consul 动态解析可用实例地址。
+- `search-service` 当前只提供 HTTP 接口，不提供 gRPC；它通过共享事件契约消费 `resume:events` 并将简历索引到 Elasticsearch。
+- 服务发现命名统一通过 `internal/shared/consul` 生成：逻辑服务名与协议共同决定最终 Consul service name，例如 `resume-service-http`、`resume-service-grpc`、`search-service-http`。
+- `gateway` 当前是轻量级路径代理，按路径前缀决定目标服务，并通过“逻辑服务名 + HTTP 协议”动态解析可用实例地址。
+
+### Consul 注册与发现约定
+
+当前实现统一使用以下抽象：
+
+- 逻辑服务名：
+  - `resume-service`
+  - `interview-service`
+  - `search-service`
+- 协议：
+  - `http`
+  - `grpc`
+- 命名函数：
+  - `ServiceName(baseName, protocol)`
+- 注册载体：
+  - `Endpoint{BaseName, Protocol, IP, Port}`
+
+服务侧约束：
+
+- `resume-service` 注册 HTTP 与 gRPC endpoint
+- `interview-service` 注册 HTTP 与 gRPC endpoint
+- `search-service` 仅注册 HTTP endpoint
+- gateway 只发现 HTTP endpoint
 
 ### 共享模块使用示例
 

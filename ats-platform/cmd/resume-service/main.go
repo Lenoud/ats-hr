@@ -37,54 +37,56 @@ import (
 var indexHTML string
 
 type Config struct {
-	ServiceName   string
-	HTTPHost      string
-	HTTPPort      string
-	GRPCHost      string
-	GRPCPort      string
-	ConsulHost    string
-	ConsulPort    string
-	DBHost        string
-	DBPort        string
-	DBUser        string
-	DBPassword    string
-	DBName        string
-	MinioEndpoint string
-	MinioUser     string
-	MinioPassword string
-	MinioBucket   string
-	MinioUseSSL   bool
-	RedisAddr     string
-	RedisStream   string
-	LLMBaseURL    string
-	LLMAPIKey     string
-	LLMModel      string
+	ServiceName    string
+	HTTPHost       string
+	HTTPPort       string
+	GRPCHost       string
+	GRPCPort       string
+	ConsulHost     string
+	ConsulPort     string
+	DBHost         string
+	DBPort         string
+	DBUser         string
+	DBPassword     string
+	DBName         string
+	MinioEndpoint  string
+	MinioUser      string
+	MinioPassword  string
+	MinioBucket    string
+	MinioUseSSL    bool
+	RedisAddr      string
+	RedisStream    string
+	LLMBaseURL     string
+	LLMAPIKey      string
+	LLMModel       string
+	ServiceAddress string
 }
 
 func loadConfig() *Config {
 	return &Config{
-		ServiceName:   getEnv("SERVICE_NAME", "resume-service"),
-		HTTPHost:      getEnv("HTTP_HOST", "0.0.0.0"),
-		HTTPPort:      getEnv("HTTP_PORT", "8081"),
-		GRPCHost:      getEnv("GRPC_HOST", "0.0.0.0"),
-		GRPCPort:      getEnv("GRPC_PORT", "9090"),
-		ConsulHost:    getEnv("CONSUL_HOST", "192.168.1.40"),
-		ConsulPort:    getEnv("CONSUL_PORT", "8500"),
-		DBHost:        getEnv("DB_HOST", "192.168.250.233"),
-		DBPort:        getEnv("DB_PORT", "5432"),
-		DBUser:        getEnv("DB_USER", "postgres"),
-		DBPassword:    getEnv("DB_PASSWORD", "postgres"),
-		DBName:        getEnv("DB_NAME", "ats"),
-		MinioEndpoint: getEnv("MINIO_ENDPOINT", "192.168.250.233:9000"),
-		MinioUser:     getEnv("MINIO_USER", "minioadmin"),
-		MinioPassword: getEnv("MINIO_PASSWORD", "minioadmin"),
-		MinioBucket:   getEnv("MINIO_BUCKET", "resumes"),
-		MinioUseSSL:   getEnv("MINIO_USE_SSL", "false") == "true",
-		RedisAddr:     getEnv("REDIS_ADDR", "192.168.250.233:6379"),
-		RedisStream:   getEnv("REDIS_STREAM", "resume:events"),
-		LLMBaseURL:    getEnv("LLM_BASE_URL", "https://api.moonshot.cn/v1"),
-		LLMAPIKey:     getEnv("LLM_API_KEY", "sk-RlKlY5b6lPVV8nyD8zjmJYlNWNI7j9TEgcQFi3gfz9OObOAs"),
-		LLMModel:      getEnv("LLM_MODEL", "moonshot-v1-8k"),
+		ServiceName:    getEnv("SERVICE_NAME", "resume-service"),
+		HTTPHost:       getEnv("HTTP_HOST", "0.0.0.0"),
+		HTTPPort:       getEnv("HTTP_PORT", "8081"),
+		GRPCHost:       getEnv("GRPC_HOST", "0.0.0.0"),
+		GRPCPort:       getEnv("GRPC_PORT", "9090"),
+		ConsulHost:     getEnv("CONSUL_HOST", "192.168.1.40"),
+		ConsulPort:     getEnv("CONSUL_PORT", "8500"),
+		DBHost:         getEnv("DB_HOST", "192.168.250.233"),
+		DBPort:         getEnv("DB_PORT", "5432"),
+		DBUser:         getEnv("DB_USER", "postgres"),
+		DBPassword:     getEnv("DB_PASSWORD", "postgres"),
+		DBName:         getEnv("DB_NAME", "ats"),
+		MinioEndpoint:  getEnv("MINIO_ENDPOINT", "192.168.250.233:9000"),
+		MinioUser:      getEnv("MINIO_USER", "minioadmin"),
+		MinioPassword:  getEnv("MINIO_PASSWORD", "minioadmin"),
+		MinioBucket:    getEnv("MINIO_BUCKET", "resumes"),
+		MinioUseSSL:    getEnv("MINIO_USE_SSL", "false") == "true",
+		RedisAddr:      getEnv("REDIS_ADDR", "192.168.250.233:6379"),
+		RedisStream:    getEnv("REDIS_STREAM", "resume:events"),
+		LLMBaseURL:     getEnv("LLM_BASE_URL", "https://api.moonshot.cn/v1"),
+		LLMAPIKey:      getEnv("LLM_API_KEY", "sk-RlKlY5b6lPVV8nyD8zjmJYlNWNI7j9TEgcQFi3gfz9OObOAs"),
+		LLMModel:       getEnv("LLM_MODEL", "moonshot-v1-8k"),
+		ServiceAddress: getEnv("SERVICE_ADDRESS", ""),
 	}
 }
 
@@ -170,22 +172,31 @@ func main() {
 	if err != nil {
 		log.Fatalf("NewConsul failed: %v", err)
 	}
-	ipObj, err := consul.GetOutboundIP()
+	ip, err := consul.ResolveServiceAddress(cfg.ServiceAddress)
 	if err != nil {
-		log.Fatalf("GetOutboundIP failed: %v", err)
+		log.Fatalf("ResolveServiceAddress failed: %v", err)
 	}
-	ip := ipObj.String()
 	httpPort, _ := strconv.Atoi(cfg.HTTPPort)
 	grpcPort, _ := strconv.Atoi(cfg.GRPCPort)
 	instanceUUID := uuid.NewString()
-	httpServiceName := cfg.ServiceName + "-http"
-	grpcServiceName := cfg.ServiceName + "-grpc"
-	httpServiceID := consul.ServiceID(httpServiceName, ip, httpPort, instanceUUID)
-	grpcServiceID := consul.ServiceID(grpcServiceName, ip, grpcPort, instanceUUID)
-	if err := consulClient.RegisterService(httpServiceName, ip, httpPort, instanceUUID); err != nil {
+	httpEndpoint := consul.Endpoint{
+		BaseName: consul.ResumeServiceBaseName,
+		Protocol: consul.ProtocolHTTP,
+		IP:       ip,
+		Port:     httpPort,
+	}
+	grpcEndpoint := consul.Endpoint{
+		BaseName: consul.ResumeServiceBaseName,
+		Protocol: consul.ProtocolGRPC,
+		IP:       ip,
+		Port:     grpcPort,
+	}
+	httpServiceID := consul.EndpointServiceID(httpEndpoint, instanceUUID)
+	grpcServiceID := consul.EndpointServiceID(grpcEndpoint, instanceUUID)
+	if err := consulClient.RegisterEndpoint(httpEndpoint, instanceUUID); err != nil {
 		log.Fatalf("RegisterService http failed: %v", err)
 	}
-	if err := consulClient.RegisterService(grpcServiceName, ip, grpcPort, instanceUUID); err != nil {
+	if err := consulClient.RegisterEndpoint(grpcEndpoint, instanceUUID); err != nil {
 		log.Fatalf("RegisterService grpc failed: %v", err)
 	}
 	fmt.Println("✅ Registered HTTP service to Consul with ID:", httpServiceID)

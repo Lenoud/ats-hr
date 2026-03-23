@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 
+	sharedconsul "github.com/example/ats-platform/internal/shared/consul"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -29,7 +31,8 @@ func newServiceDiscovery(consulAddr string) (*serviceDiscovery, error) {
 	return &serviceDiscovery{client: client}, nil
 }
 
-func (d *serviceDiscovery) resolve(serviceName string) (*serviceInstance, error) {
+func (d *serviceDiscovery) resolve(baseName string, protocol sharedconsul.Protocol) (*serviceInstance, error) {
+	serviceName := sharedconsul.ServiceName(baseName, protocol)
 	services, _, err := d.client.Health().Service(serviceName, "", true, nil)
 	if err != nil {
 		return nil, fmt.Errorf("discover service %s: %w", serviceName, err)
@@ -49,9 +52,21 @@ func (d *serviceDiscovery) resolve(serviceName string) (*serviceInstance, error)
 
 	return &serviceInstance{
 		Name:    serviceName,
-		Address: address,
+		Address: normalizeServiceAddress(address),
 		Port:    entry.Service.Port,
 	}, nil
+}
+
+func normalizeServiceAddress(address string) string {
+	if address != "host.docker.internal" {
+		return address
+	}
+
+	if _, err := net.LookupHost(address); err == nil {
+		return address
+	}
+
+	return "127.0.0.1"
 }
 
 func (i *serviceInstance) baseURL() string {

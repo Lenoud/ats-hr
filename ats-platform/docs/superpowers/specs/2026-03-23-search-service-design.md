@@ -175,13 +175,20 @@ HTTP 响应通过共享 `response` 包统一封装，分页搜索接口返回：
 
 ### Consul
 
-服务启动时会注册到 Consul，当前注册名为 `search-service-http`，默认配置：
+服务启动时会注册到 Consul。当前注册发现规则已经对齐共享抽象：
+
+- 逻辑服务名：`search-service`
+- 协议：`http`
+- 最终注册名：`ServiceName("search-service", "http")`，即 `search-service-http`
+
+默认配置：
 
 | 环境变量 | 默认值 |
 |----------|--------|
 | `SERVICE_NAME` | `search-service` |
 | `CONSUL_HOST` | `127.0.0.1` |
 | `CONSUL_PORT` | `8500` |
+| `SERVICE_ADDRESS` | 空 | 可选，显式指定注册到 Consul 的地址 |
 
 ### 健康接口
 
@@ -204,7 +211,8 @@ HTTP 响应通过共享 `response` 包统一封装，分页搜索接口返回：
 
 ## 边界与已知限制
 
-- 当前不提供 gRPC 接口；在 Consul 服务发现中仅注册 HTTP 实例 `search-service-http`。
+- 当前不提供 gRPC 接口；在 Consul 服务发现中仅注册 HTTP endpoint。
 - 服务依赖共享事件契约中的 `ResumeDocumentPayload` 与 `ResumeStatusChangedPayload` 来建立搜索文档和同步状态。
-- 当前网关通过路径前缀将 `/api/v1/search*` 请求转发到本服务，并通过 `search-service-http` 做动态路由。
+- 当前网关通过路径前缀将 `/api/v1/search*` 请求转发到本服务，并通过“逻辑服务名 + HTTP 协议”做动态路由解析。
+- 在本地开发场景下，如果 Consul 运行在 Docker、服务运行在宿主机，可通过 `SERVICE_ADDRESS=host.docker.internal` 让容器内健康检查命中宿主机服务。
 - 本文档不包含未实现的测试计划或未来重构方案，只描述仓库现状。
