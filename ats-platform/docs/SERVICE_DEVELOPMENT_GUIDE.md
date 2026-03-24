@@ -9,7 +9,7 @@
 - `resume-service`：HTTP + gRPC
 - `interview-service`：HTTP + gRPC
 - `search-service`：HTTP
-- `gateway`：HTTP，负责首页、健康聚合与代理
+- `gateway`：HTTP，负责首页、健康聚合、代理，以及主链路调试编排页
 
 ## 分层结构
 
@@ -132,6 +132,30 @@ consulClient.RegisterEndpoint(endpoint, instanceID)
 
 - route table 只能表达“逻辑服务名 + 协议”
 - 不要在 gateway 运行逻辑里硬编码最终 Consul service name
+
+## Gateway 前端约定
+
+`gateway` 首页当前定位为 orchestration console，而不是简单导航页。
+
+它负责：
+
+- 通过真实 gateway 路由执行主链路调试
+- 展示步骤状态、运行上下文、最近请求/响应
+- 展示 gateway 自己的健康聚合和 upstream 发现结果
+
+当前主闭环为：
+
+1. 创建简历
+2. 更新状态，并在可行时尝试解析
+3. 创建面试
+4. 搜索验证
+5. 汇总 gateway 健康与链路结果
+
+维护要求：
+
+- 页面继续使用静态 HTML + 原生 JS
+- 业务请求必须走 gateway 自己的 `/api/v1/*` 路由
+- 不新增只服务页面 demo 的 orchestration backend API
 
 ## 本地开发约定
 
