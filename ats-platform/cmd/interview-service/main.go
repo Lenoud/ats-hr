@@ -60,7 +60,7 @@ func loadConfig() *Config {
 		GRPCPort:       getEnv("GRPC_PORT", "9091"),
 		HTTPHost:       getEnv("HTTP_HOST", "0.0.0.0"),
 		HTTPPort:       getEnv("HTTP_PORT", "8082"),
-		ConsulHost:     getEnv("CONSUL_HOST", "192.168.1.40"),
+		ConsulHost:     getEnv("CONSUL_HOST", "127.0.0.1"),
 		ConsulPort:     getEnv("CONSUL_PORT", "8500"),
 		DBHost:         getEnv("DB_HOST", "192.168.250.233"),
 		DBPort:         getEnv("DB_PORT", "5432"),

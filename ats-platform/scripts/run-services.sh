@@ -83,6 +83,19 @@ done
 
 mkdir -p "$GOCACHE_DIR"
 
+export CONSUL_HOST="${CONSUL_HOST:-127.0.0.1}"
+export CONSUL_PORT="${CONSUL_PORT:-8500}"
+export DB_HOST="${DB_HOST:-127.0.0.1}"
+export DB_PORT="${DB_PORT:-5432}"
+export REDIS_ADDR="${REDIS_ADDR:-127.0.0.1:6379}"
+export MINIO_ENDPOINT="${MINIO_ENDPOINT:-127.0.0.1:9000}"
+export ES_ADDRESSES="${ES_ADDRESSES:-http://127.0.0.1:9200}"
+
+if [[ -z "${SERVICE_ADDRESS:-}" ]] && [[ "${CONSUL_HOST}" == "127.0.0.1" ]]; then
+  export SERVICE_ADDRESS="host.docker.internal"
+  log "defaulting SERVICE_ADDRESS=host.docker.internal for host-run services with Docker Consul"
+fi
+
 if ((START_INFRA)); then
   log "starting docker-compose dependencies..."
   docker-compose -f deployments/docker-compose.yml up -d
