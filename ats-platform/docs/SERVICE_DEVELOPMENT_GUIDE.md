@@ -1,10 +1,10 @@
 # ATS Platform 服务开发指南
 
-本指南说明 ATS Platform 当前服务开发的基础约定，供 `resume-service`、`interview-service`、`search-service` 与 `gateway` 参考。
+本指南说明 ATS Platform 当前服务开发和本地联调的基础约定，供 `resume-service`、`interview-service`、`search-service` 与 `gateway` 参考。
 
 ## 适用范围
 
-当前仓库中的服务现状：
+当前仓库中的服务状态：
 
 - `resume-service`：HTTP + gRPC
 - `interview-service`：HTTP + gRPC
@@ -62,7 +62,7 @@ ats-platform/
 └── proto/
 ```
 
-## 服务发现约定
+## 服务注册与发现
 
 服务发现逻辑统一收敛在：
 
@@ -97,7 +97,7 @@ consul.ServiceName(baseName, protocol)
 
 ### Endpoint 注册模型
 
-服务端应优先使用：
+服务端优先使用：
 
 ```go
 consul.Endpoint{
@@ -116,56 +116,59 @@ consulClient.RegisterEndpoint(endpoint, instanceID)
 
 完成注册。
 
-## 本地开发 Consul 约定
+## Gateway 路由约定
 
-当：
+`gateway` 当前仍是轻量路径代理，按 `/api/v1/*` 下的路径前缀选择目标服务。
 
-- 服务运行在宿主机
-- Consul 运行在 Docker
+当前规则：
 
-推荐使用：
+- `/resumes` 默认转发到 `resume-service`
+- `/interviews` 转发到 `interview-service`
+- `/portfolios` 转发到 `interview-service`
+- `/search` 转发到 `search-service`
+- `/resumes/:id/interviews` 与 `/resumes/:id/portfolios` 这类嵌套路由，优先转发到 `interview-service`
 
-```bash
-SERVICE_ADDRESS=host.docker.internal
-```
+维护要求：
 
-如果不设置 `SERVICE_ADDRESS`，服务会回退到自动探测出口 IP。
+- route table 只能表达“逻辑服务名 + 协议”
+- 不要在 gateway 运行逻辑里硬编码最终 Consul service name
 
-`gateway` 在本地开发场景下，如果从 Consul 发现到 `host.docker.internal` 但当前环境无法解析，会回落到 `127.0.0.1`。
+## 本地开发约定
 
-## 运行方式
-
-### 推荐本地启动
-
-```bash
-cd ats-platform
-make run-all
-```
-
-该方式默认按“Docker Consul + 宿主机服务”运行模型处理。
-
-如果 Consul 在宿主机运行：
+### 推荐启动方式
 
 ```bash
 cd ats-platform
-make run-all-host-consul
+./scripts/run-services.sh --no-infra --gateway
 ```
 
-### 单服务启动
+`Makefile` 里的多服务命令应只作为脚本薄包装，不再复制编排逻辑。
 
-```bash
-cd ats-platform
-go run ./cmd/resume-service
-go run ./cmd/interview-service
-go run ./cmd/search-service
-go run ./cmd/gateway
-```
+### 默认本地拓扑
+
+`run-services.sh` 当前默认按“Docker Consul + 宿主机服务”处理本地联调：
+
+- 默认 `CONSUL_HOST=127.0.0.1`
+- 默认数据库、Redis、MinIO、Elasticsearch 走 `127.0.0.1`
+- 如果未显式设置 `SERVICE_ADDRESS`，脚本会默认导出 `host.docker.internal`
+
+这使得：
+
+- 宿主机运行的服务可以被 Docker 内 Consul 做健康检查
+- gateway 在宿主机上能通过 Consul 解析并访问这些 HTTP 实例
+
+### `host.docker.internal` 兼容规则
+
+在宿主机本地开发场景下：
+
+- 服务注册到 Consul 时可使用 `SERVICE_ADDRESS=host.docker.internal`
+- gateway 如果从 Consul 解析到 `host.docker.internal` 但当前环境不可解析，会回退到 `127.0.0.1`
 
 ## 文档分类规则
 
 - 正式文档：放在 `ats-platform/docs/`
 - 测试/实验文档：放在 `ats-platform/docs/tests/`
-- 设计/计划文档：放在 `ats-platform/docs/superpowers/`
+- 设计/计划文档：放在仓库根目录 `docs/superpowers/`
 
 新增或更新文档时，应保证：
 
@@ -176,6 +179,5 @@ go run ./cmd/gateway
 ## 相关文档
 
 - `ats-platform/docs/README.md`
-- `ats-platform/docs/consul-integration.md`
-- `ats-platform/docs/resume-service-api.md`
+- `ats-platform/docs/interview-service-grpc.md`
 - `ats-platform/docs/tests/interview-service-api-test.md`

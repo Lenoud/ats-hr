@@ -1,7 +1,7 @@
 # ATS 招聘管理平台设计文档
 
 > **参考实现**: `internal/resume/` 模块
-> **开发指南**: `docs/SERVICE_DEVELOPMENT_GUIDE.md`
+> **开发指南**: `ats-platform/docs/SERVICE_DEVELOPMENT_GUIDE.md`
 
 ## 概述
 
@@ -657,7 +657,7 @@ Resume Service:
 
 ## 开发规范
 
-详细开发规范请参考: [SERVICE_DEVELOPMENT_GUIDE.md](../SERVICE_DEVELOPMENT_GUIDE.md)
+详细开发规范请参考: `ats-platform/docs/SERVICE_DEVELOPMENT_GUIDE.md`
 
 ### 核心原则
 

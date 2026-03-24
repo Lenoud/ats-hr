@@ -30,6 +30,14 @@ var routeTargets = []struct {
 	Target routeTarget
 }{
 	{
+		Prefix: "/resumes/",
+		Target: routeTarget{
+			ServiceKey:      "interview",
+			BaseServiceName: sharedconsul.InterviewServiceBaseName,
+			Protocol:        sharedconsul.ProtocolHTTP,
+		},
+	},
+	{
 		Prefix: "/resumes",
 		Target: routeTarget{
 			ServiceKey:      "resume",
@@ -251,6 +259,14 @@ func checkServiceStatus(discovery *serviceDiscovery, baseName string, protocol s
 
 func resolveRouteTarget(path string) (*routeTarget, bool) {
 	for _, item := range routeTargets {
+		if item.Prefix == "/resumes/" {
+			if strings.HasPrefix(path, "/resumes/") &&
+				(strings.Contains(path, "/interviews") || strings.Contains(path, "/portfolios")) {
+				target := item.Target
+				return &target, true
+			}
+			continue
+		}
 		if strings.HasPrefix(path, item.Prefix) {
 			target := item.Target
 			return &target, true
