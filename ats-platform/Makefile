@@ -1,4 +1,4 @@
-.PHONY: infra-up infra-down proto migrate-up test run-gateway run-resume run-interview run-search run-all run-all-no-infra run-all-with-gateway build-services clean
+.PHONY: infra-up infra-down proto migrate-up test run-gateway run-resume run-interview run-search run-all run-all-no-infra run-all-with-gateway run-all-host-consul build-services clean
 
 # Infrastructure
 infra-up:
@@ -39,6 +39,9 @@ run-all-no-infra:
 
 run-all-with-gateway:
 	./scripts/run-services.sh --gateway
+
+run-all-host-consul:
+	./scripts/run-services.sh --host-consul
 
 build-services:
 	./scripts/run-services.sh --build-only

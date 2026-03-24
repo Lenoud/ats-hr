@@ -15,6 +15,7 @@ PIDS=()
 START_INFRA=1
 BUILD_ONLY=0
 GOCACHE_DIR="${ROOT_DIR}/.gocache"
+LOCAL_CONSUL_DOCKER=1
 
 usage() {
   cat <<'EOF'
@@ -27,6 +28,7 @@ Options:
   --no-infra     Do not start docker-compose dependencies
   --build-only   Only build the three binaries, do not run them
   --gateway      Also build and run the API gateway
+  --host-consul  Assume Consul is running on the host instead of Docker and do not default SERVICE_ADDRESS
   -h, --help     Show this help
 EOF
 }
@@ -68,6 +70,9 @@ while (($# > 0)); do
     --gateway)
       SERVICES+=("gateway:./cmd/gateway:gateway")
       ;;
+    --host-consul)
+      LOCAL_CONSUL_DOCKER=0
+      ;;
     -h|--help)
       usage
       exit 0
@@ -101,6 +106,26 @@ if ((BUILD_ONLY)); then
 fi
 
 trap cleanup SIGINT SIGTERM EXIT
+
+if ((LOCAL_CONSUL_DOCKER)) && [[ -z "${SERVICE_ADDRESS:-}" ]]; then
+  export SERVICE_ADDRESS="host.docker.internal"
+  log "defaulting SERVICE_ADDRESS=${SERVICE_ADDRESS} for host-run services with Docker Consul"
+fi
+
+export CONSUL_HOST="${CONSUL_HOST:-127.0.0.1}"
+export CONSUL_PORT="${CONSUL_PORT:-8500}"
+export DB_HOST="${DB_HOST:-127.0.0.1}"
+export DB_PORT="${DB_PORT:-5432}"
+export DB_USER="${DB_USER:-postgres}"
+export DB_PASSWORD="${DB_PASSWORD:-postgres}"
+export DB_NAME="${DB_NAME:-ats}"
+export REDIS_ADDR="${REDIS_ADDR:-127.0.0.1:6379}"
+export MINIO_ENDPOINT="${MINIO_ENDPOINT:-127.0.0.1:9000}"
+export MINIO_USER="${MINIO_USER:-minioadmin}"
+export MINIO_PASSWORD="${MINIO_PASSWORD:-minioadmin}"
+export MINIO_BUCKET="${MINIO_BUCKET:-resumes}"
+export MINIO_USE_SSL="${MINIO_USE_SSL:-false}"
+export ES_ADDRESSES="${ES_ADDRESSES:-http://127.0.0.1:9200}"
 
 for service in "${SERVICES[@]}"; do
   IFS=':' read -r name _ output_name <<<"$service"
