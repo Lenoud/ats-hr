@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS Gateway Orchestrator</title>
+    <style>
+        :root {
+            --bg-top: #e3ddd0;
+            --bg-bottom: #f5f1ea;
+            --paper: rgba(255, 252, 247, 0.92);
+            --panel: rgba(255, 255, 255, 0.82);
+            --ink: #1f2b2f;
+            --muted: #65747b;
+            --accent: #1e645c;
+            --accent-deep: #134942;
+            --amber: #a85a1d;
+            --amber-deep: #874312;
+            --ok: #2f8146;
+            --danger: #b63f35;
+            --warn: #be7f1d;
+            --line: rgba(31, 43, 47, 0.12);
+            --shadow: 0 26px 60px rgba(58, 48, 32, 0.12);
+            --radius-xl: 26px;
+            --radius-lg: 18px;
+            --radius-md: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 14% 10%, rgba(30, 100, 92, 0.16), transparent 24%),
+                radial-gradient(circle at 82% 16%, rgba(168, 90, 29, 0.14), transparent 18%),
+                radial-gradient(circle at 84% 86%, rgba(30, 100, 92, 0.09), transparent 20%),
+                linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+            padding: 22px;
+        }
+
+        .shell {
+            max-width: 1380px;
+            margin: 0 auto;
+            display: grid;
+            gap: 18px;
+        }
+
+        .hero,
+        .panel {
+            background: var(--paper);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        .hero {
+            padding: 30px;
+        }
+
+        .eyebrow {
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            font-size: 12px;
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(34px, 5vw, 60px);
+            line-height: 1.02;
+        }
+
+        .hero p {
+            margin: 14px 0 0;
+            max-width: 780px;
+            color: var(--muted);
+            font-size: 18px;
+            line-height: 1.65;
+        }
+
+        .hero-meta,
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.75);
+            font-size: 14px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1.18fr 0.82fr;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .stack {
+            display: grid;
+            gap: 18px;
+        }
+
+        .panel-inner {
+            padding: 24px;
+        }
+
+        .section-title {
+            margin: 0 0 8px;
+            font-size: 24px;
+        }
+
+        .section-copy {
+            margin: 0 0 18px;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            padding: 18px;
+        }
+
+        .card + .card {
+            margin-top: 14px;
+        }
+
+        .flow {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .flow-step {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(255,255,255,0.76);
+            padding: 16px;
+            min-height: 132px;
+        }
+
+        .flow-step .step-no {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+        }
+
+        .flow-step h3 {
+            margin: 8px 0 10px;
+            font-size: 18px;
+        }
+
+        .flow-step p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .status-dot {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: rgba(31, 43, 47, 0.08);
+            font-size: 12px;
+        }
+
+        .status-idle { color: var(--muted); }
+        .status-running { color: var(--amber); }
+        .status-success { color: var(--ok); }
+        .status-error { color: var(--danger); }
+        .status-degraded { color: var(--warn); }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .step-card h3,
+        .card h3 {
+            margin: 0 0 12px;
+            font-size: 20px;
+        }
+
+        .step-card .summary {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.72);
+            border: 1px solid var(--line);
+            min-height: 58px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        input,
+        select,
+        textarea,
+        button,
+        pre,
+        code {
+            font: inherit;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            border: 1px solid rgba(31, 43, 47, 0.18);
+            background: rgba(255,255,255,0.92);
+            border-radius: 12px;
+            padding: 12px 13px;
+            color: var(--ink);
+        }
+
+        textarea,
+        pre {
+            font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .button-row {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            cursor: pointer;
+            transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+            color: white;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button.primary {
+            background: var(--accent);
+        }
+
+        button.primary:hover {
+            background: var(--accent-deep);
+        }
+
+        button.secondary {
+            background: var(--amber);
+        }
+
+        button.secondary:hover {
+            background: var(--amber-deep);
+        }
+
+        button.ghost {
+            background: rgba(255,255,255,0.84);
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+
+        button[disabled] {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .context-list,
+        .health-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .kv {
+            display: grid;
+            gap: 4px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.7);
+            border: 1px solid var(--line);
+        }
+
+        .kv-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+        }
+
+        .kv-value {
+            font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+
+        .inspector-block + .inspector-block {
+            margin-top: 14px;
+        }
+
+        pre {
+            margin: 0;
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.76);
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 92px;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 6px;
+        }
+
+        .toast-container {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 30;
+            display: grid;
+            gap: 10px;
+            max-width: 320px;
+        }
+
+        .toast {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 12px 14px;
+            border-radius: 16px;
+            color: white;
+            box-shadow: 0 18px 30px rgba(0,0,0,0.18);
+            animation: slideIn 0.22s ease;
+        }
+
+        .toast.success { background: var(--ok); }
+        .toast.error { background: var(--danger); }
+        .toast.info { background: var(--accent); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(10px); }
+        }
+
+        @media (max-width: 1160px) {
+            .layout,
+            .grid,
+            .flow {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 14px;
+            }
+
+            .hero,
+            .panel-inner {
+                padding: 18px;
+            }
+
+            h1 {
+                font-size: 38px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <div class="eyebrow">ATS Gateway Orchestrator</div>
+            <h1>从统一入口编排并观察整条招聘链路</h1>
+            <p>
+                这个页面不做完整 CRUD，而是让你真实经过 gateway 路由执行主流程：
+                创建简历、推进状态、创建面试、搜索验证，并同时观察健康聚合与最近请求响应。
+            </p>
+            <div class="hero-meta">
+                <span class="pill" id="heroHealth">Gateway health: checking...</span>
+                <span class="pill" id="heroLastRun">Last run: never</span>
+                <span class="pill">Routes: real gateway proxy</span>
+            </div>
+            <div class="hero-actions">
+                <button class="primary" id="runFullDemoBtn">Run Full Demo</button>
+                <button class="secondary" id="refreshHealthBtn">Refresh Health</button>
+                <button class="ghost" id="resetContextBtn">Reset Context</button>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-inner">
+                <h2 class="section-title">Flow Overview</h2>
+                <p class="section-copy">主闭环由 5 个步骤组成。你可以一键串行执行，也可以单独重跑某一步。</p>
+                <div class="flow">
+                    <div class="flow-step">
+                        <div class="step-no">Step 1</div>
+                        <h3>Create Resume</h3>
+                        <p>通过 gateway 创建一条可用于后续链路的简历记录。</p>
+                        <div class="status-dot status-idle" id="status-step1">idle</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="step-no">Step 2</div>
+                        <h3>Update / Parse</h3>
+                        <p>先更新简历状态；若可行，再尝试触发解析，并允许降级继续。</p>
+                        <div class="status-dot status-idle" id="status-step2">idle</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="step-no">Step 3</div>
+                        <h3>Create Interview</h3>
+                        <p>基于当前简历 ID 创建一条面试记录，验证嵌套路由链路。</p>
+                        <div class="status-dot status-idle" id="status-step3">idle</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="step-no">Step 4</div>
+                        <h3>Search Verify</h3>
+                        <p>走 gateway 搜索接口，确认新简历已经可以被检索到。</p>
+                        <div class="status-dot status-idle" id="status-step4">idle</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="step-no">Step 5</div>
+                        <h3>Gateway Summary</h3>
+                        <p>查看 gateway 对各服务的健康聚合，以及本轮上下文摘要。</p>
+                        <div class="status-dot status-idle" id="status-step5">idle</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="layout">
+            <div class="stack">
+                <section class="panel">
+                    <div class="panel-inner">
+                        <h2 class="section-title">Step Cards</h2>
+                        <p class="section-copy">默认演示参数已经填好。你可以修改后单独运行某一步，或者交给 Full Demo 串行驱动。</p>
+                        <div class="grid">
+                            <div class="card step-card">
+                                <h3>Step 1 · Create Resume</h3>
+                                <label for="resumeName">Candidate Name</label>
+                                <input id="resumeName" value="Gateway Demo Candidate">
+                                <label for="resumeEmail">Email</label>
+                                <input id="resumeEmail" value="gateway-demo@example.com">
+                                <label for="resumePhone">Phone</label>
+                                <input id="resumePhone" value="13800138000">
+                                <label for="resumeSource">Source</label>
+                                <input id="resumeSource" value="gateway-orchestrator">
+                                <div class="button-row">
+                                    <button class="primary" id="runStep1Btn">Run Step</button>
+                                </div>
+                                <div class="summary" id="summary-step1">No execution yet.</div>
+                            </div>
+
+                            <div class="card step-card">
+                                <h3>Step 2 · Update / Parse</h3>
+                                <label for="resumeStatus">Target Status</label>
+                                <select id="resumeStatus">
+                                    <option value="processing" selected>processing</option>
+                                    <option value="parsed">parsed</option>
+                                    <option value="archived">archived</option>
+                                </select>
+                                <label for="parseToggle">Parse Strategy</label>
+                                <select id="parseToggle">
+                                    <option value="attempt" selected>attempt parse if possible</option>
+                                    <option value="skip">skip parse, update status only</option>
+                                </select>
+                                <p class="hint">如果没有上传文件或解析失败，本步骤允许以 degraded 状态继续。</p>
+                                <div class="button-row">
+                                    <button class="primary" id="runStep2Btn">Run Step</button>
+                                </div>
+                                <div class="summary" id="summary-step2">No execution yet.</div>
+                            </div>
+
+                            <div class="card step-card">
+                                <h3>Step 3 · Create Interview</h3>
+                                <label for="interviewRound">Round</label>
+                                <input id="interviewRound" type="number" min="1" value="1">
+                                <label for="interviewerName">Interviewer</label>
+                                <input id="interviewerName" value="Gateway Flow Owner">
+                                <label for="interviewTime">Scheduled At</label>
+                                <input id="interviewTime" type="datetime-local" value="2026-03-25T10:00">
+                                <div class="button-row">
+                                    <button class="primary" id="runStep3Btn">Run Step</button>
+                                </div>
+                                <div class="summary" id="summary-step3">No execution yet.</div>
+                            </div>
+
+                            <div class="card step-card">
+                                <h3>Step 4 · Search Verify</h3>
+                                <label for="searchQuery">Search Query</label>
+                                <input id="searchQuery" value="Gateway Demo Candidate">
+                                <label for="searchPageSize">Page Size</label>
+                                <input id="searchPageSize" type="number" min="1" max="20" value="5">
+                                <p class="hint">默认使用当前候选人姓名作为搜索词，用于确认新建简历可见。</p>
+                                <div class="button-row">
+                                    <button class="primary" id="runStep4Btn">Run Step</button>
+                                </div>
+                                <div class="summary" id="summary-step4">No execution yet.</div>
+                            </div>
+
+                            <div class="card step-card">
+                                <h3>Step 5 · Gateway Summary</h3>
+                                <p class="hint">刷新 gateway 自身的健康聚合，并把本轮流程的关键上下文汇总显示出来。</p>
+                                <div class="button-row">
+                                    <button class="primary" id="runStep5Btn">Run Step</button>
+                                </div>
+                                <div class="summary" id="summary-step5">No execution yet.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="stack">
+                <section class="panel">
+                    <div class="panel-inner">
+                        <h2 class="section-title">Runtime Context</h2>
+                        <div class="context-list">
+                            <div class="kv">
+                                <div class="kv-label">Resume ID</div>
+                                <div class="kv-value" id="ctx-resumeId">-</div>
+                            </div>
+                            <div class="kv">
+                                <div class="kv-label">Interview ID</div>
+                                <div class="kv-value" id="ctx-interviewId">-</div>
+                            </div>
+                            <div class="kv">
+                                <div class="kv-label">Search Query</div>
+                                <div class="kv-value" id="ctx-searchQuery">-</div>
+                            </div>
+                            <div class="kv">
+                                <div class="kv-label">Last Success Step</div>
+                                <div class="kv-value" id="ctx-lastSuccessStep">-</div>
+                            </div>
+                            <div class="kv">
+                                <div class="kv-label">Last Error</div>
+                                <div class="kv-value" id="ctx-lastError">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-inner">
+                        <h2 class="section-title">Request / Response Inspector</h2>
+                        <div class="inspector-block">
+                            <label>Last Request</label>
+                            <pre id="lastRequest">No request yet.</pre>
+                        </div>
+                        <div class="inspector-block">
+                            <label>Last Response</label>
+                            <pre id="lastResponse">No response yet.</pre>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-inner">
+                        <h2 class="section-title">Service Health</h2>
+                        <p class="section-copy">显示 gateway 当前聚合到的服务健康与 upstream 地址。</p>
+                        <div class="health-list" id="healthList">
+                            <div class="kv">
+                                <div class="kv-label">gateway</div>
+                                <div class="kv-value">Checking...</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const state = {
+            steps: {
+                step1: "idle",
+                step2: "idle",
+                step3: "idle",
+                step4: "idle",
+                step5: "idle",
+            },
+            resumeId: "",
+            interviewId: "",
+            searchQuery: "",
+            lastSuccessStep: "",
+            lastError: "",
+            lastRequest: null,
+            lastResponse: null,
+            health: null,
+            lastRunAt: "",
+        };
+
+        const $ = (id) => document.getElementById(id);
+
+        function showToast(type, message) {
+            const icons = {
+                success: "✓",
+                error: "!",
+                info: "i",
+            };
+            const container = $("toastContainer");
+            const toast = document.createElement("div");
+            toast.className = "toast " + type;
+            toast.innerHTML = "<span>" + (icons[type] || "i") + "</span><span>" + message + "</span>";
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = "slideOut 0.3s ease forwards";
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        function pretty(value) {
+            if (value === null || value === undefined) {
+                return "-";
+            }
+            if (typeof value === "string") {
+                return value;
+            }
+            try {
+                return JSON.stringify(value, null, 2);
+            } catch (_) {
+                return String(value);
+            }
+        }
+
+        function setStepStatus(step, status) {
+            state.steps[step] = status;
+            const el = $("status-" + step);
+            el.className = "status-dot status-" + status;
+            el.textContent = status;
+        }
+
+        function setSummary(step, text) {
+            $("summary-" + step).textContent = text;
+        }
+
+        function updateContext() {
+            $("ctx-resumeId").textContent = state.resumeId || "-";
+            $("ctx-interviewId").textContent = state.interviewId || "-";
+            $("ctx-searchQuery").textContent = state.searchQuery || "-";
+            $("ctx-lastSuccessStep").textContent = state.lastSuccessStep || "-";
+            $("ctx-lastError").textContent = state.lastError || "-";
+            $("heroLastRun").textContent = "Last run: " + (state.lastRunAt || "never");
+        }
+
+        function writeInspector(requestInfo, responseInfo) {
+            state.lastRequest = requestInfo;
+            state.lastResponse = responseInfo;
+            $("lastRequest").textContent = pretty(requestInfo);
+            $("lastResponse").textContent = pretty(responseInfo);
+        }
+
+        async function apiCall(method, path, body) {
+            const options = { method, headers: {} };
+            if (body !== undefined) {
+                options.headers["Content-Type"] = "application/json";
+                options.body = JSON.stringify(body);
+            }
+
+            const requestInfo = {
+                method,
+                path,
+                body: body || null,
+            };
+
+            const response = await fetch(path, options);
+            const rawText = await response.text();
+            let parsed;
+            try {
+                parsed = rawText ? JSON.parse(rawText) : null;
+            } catch (_) {
+                parsed = rawText;
+            }
+
+            const responseInfo = {
+                status: response.status,
+                ok: response.ok,
+                body: parsed,
+            };
+            writeInspector(requestInfo, responseInfo);
+
+            if (!response.ok) {
+                const detail = parsed && parsed.error ? parsed.error : rawText || response.statusText;
+                throw new Error(detail);
+            }
+            return parsed;
+        }
+
+        function markSuccess(step, summary) {
+            setStepStatus(step, "success");
+            setSummary(step, summary);
+            state.lastSuccessStep = step;
+            state.lastError = "";
+            state.lastRunAt = new Date().toLocaleString();
+            updateContext();
+        }
+
+        function markError(step, error) {
+            setStepStatus(step, "error");
+            setSummary(step, error);
+            state.lastError = error;
+            state.lastRunAt = new Date().toLocaleString();
+            updateContext();
+            showToast("error", error);
+        }
+
+        function markDegraded(step, summary) {
+            setStepStatus(step, "degraded");
+            setSummary(step, summary);
+            state.lastSuccessStep = step;
+            state.lastError = summary;
+            state.lastRunAt = new Date().toLocaleString();
+            updateContext();
+            showToast("info", summary);
+        }
+
+        async function refreshHealth() {
+            const health = await apiCall("GET", "/health");
+            state.health = health;
+            renderHealth();
+            const gatewayOk = health && health.status === "ok";
+            $("heroHealth").textContent = "Gateway health: " + (gatewayOk ? "ok" : "error");
+        }
+
+        function renderHealth() {
+            const list = $("healthList");
+            if (!state.health || !state.health.services) {
+                list.innerHTML = '<div class="kv"><div class="kv-label">gateway</div><div class="kv-value">No health snapshot yet.</div></div>';
+                return;
+            }
+
+            const services = Object.entries(state.health.services).map(([name, item]) => {
+                return `
+                    <div class="kv">
+                        <div class="kv-label">${name}</div>
+                        <div class="kv-value">status=${item.status || "unknown"}</div>
+                        <div class="kv-value">address=${item.address || "-"}</div>
+                        <div class="kv-value">status_code=${item.status_code || "-"}</div>
+                        <div class="kv-value">error=${item.error || "-"}</div>
+                    </div>
+                `;
+            }).join("");
+
+            list.innerHTML = `
+                <div class="kv">
+                    <div class="kv-label">gateway</div>
+                    <div class="kv-value">status=${state.health.status || "-"}</div>
+                    <div class="kv-value">time=${state.health.time || "-"}</div>
+                </div>
+                ${services}
+            `;
+        }
+
+        async function runStep1() {
+            setStepStatus("step1", "running");
+            const payload = {
+                name: $("resumeName").value.trim(),
+                email: $("resumeEmail").value.trim(),
+                phone: $("resumePhone").value.trim(),
+                source: $("resumeSource").value.trim(),
+            };
+            const data = await apiCall("POST", "/api/v1/resumes", payload);
+            const resume = data && data.data ? data.data : null;
+            if (!resume || !resume.id) {
+                throw new Error("resume response missing id");
+            }
+            state.resumeId = resume.id;
+            state.searchQuery = payload.name;
+            $("searchQuery").value = payload.name;
+            markSuccess("step1", "Created resume " + resume.id);
+            showToast("success", "Resume created through gateway");
+            return resume;
+        }
+
+        async function runStep2() {
+            if (!state.resumeId) {
+                throw new Error("resumeId is required before running Step 2");
+            }
+            setStepStatus("step2", "running");
+            const targetStatus = $("resumeStatus").value;
+            await apiCall("PUT", "/api/v1/resumes/" + state.resumeId + "/status", { status: targetStatus });
+
+            if ($("parseToggle").value === "skip") {
+                markSuccess("step2", "Updated resume status to " + targetStatus + " (parse skipped)");
+                showToast("success", "Resume status updated");
+                return;
+            }
+
+            try {
+                await apiCall("POST", "/api/v1/resumes/" + state.resumeId + "/parse");
+                markSuccess("step2", "Updated status and parse completed");
+                showToast("success", "Resume parse completed");
+            } catch (error) {
+                markDegraded("step2", "Status updated, parse degraded: " + error.message);
+            }
+        }
+
+        async function runStep3() {
+            if (!state.resumeId) {
+                throw new Error("resumeId is required before creating interview");
+            }
+            setStepStatus("step3", "running");
+            const localTime = $("interviewTime").value;
+            const isoTime = localTime ? new Date(localTime).toISOString() : new Date(Date.now() + 86400000).toISOString();
+            const payload = {
+                resume_id: state.resumeId,
+                round: Number($("interviewRound").value || "1"),
+                interviewer: $("interviewerName").value.trim(),
+                scheduled_at: isoTime,
+            };
+            const data = await apiCall("POST", "/api/v1/interviews", payload);
+            const interview = data && data.data ? data.data : null;
+            if (!interview || !interview.id) {
+                throw new Error("interview response missing id");
+            }
+            state.interviewId = interview.id;
+            markSuccess("step3", "Created interview " + interview.id + " for resume " + state.resumeId);
+            showToast("success", "Interview created through gateway");
+            return interview;
+        }
+
+        async function runStep4() {
+            const query = $("searchQuery").value.trim() || state.searchQuery || $("resumeName").value.trim();
+            if (!query) {
+                throw new Error("search query is required before running Step 4");
+            }
+            setStepStatus("step4", "running");
+            state.searchQuery = query;
+            const pageSize = Number($("searchPageSize").value || "5");
+            const path = "/api/v1/search?query=" + encodeURIComponent(query) + "&page=1&page_size=" + pageSize;
+            const data = await apiCall("GET", path);
+            const list = data && data.data && data.data.list ? data.data.list : [];
+            const found = state.resumeId ? list.some((item) => item.resume_id === state.resumeId) : list.length > 0;
+            if (!found) {
+                throw new Error("search completed but new resume is not visible yet");
+            }
+            markSuccess("step4", "Search verified " + list.length + " result(s); current resume is visible");
+            showToast("success", "Search verification passed");
+            return list;
+        }
+
+        async function runStep5() {
+            setStepStatus("step5", "running");
+            await refreshHealth();
+            if (!state.resumeId && !state.interviewId && !state.lastSuccessStep) {
+                throw new Error("run at least one previous step before summary");
+            }
+            const summary = [
+                "resumeId=" + (state.resumeId || "-"),
+                "interviewId=" + (state.interviewId || "-"),
+                "searchQuery=" + (state.searchQuery || "-"),
+                "lastSuccessStep=" + (state.lastSuccessStep || "-"),
+            ].join(" | ");
+            markSuccess("step5", summary);
+            showToast("success", "Gateway summary refreshed");
+        }
+
+        async function guardedRun(stepName, fn) {
+            try {
+                return await fn();
+            } catch (error) {
+                markError(stepName, error.message);
+                throw error;
+            }
+        }
+
+        async function runFullDemo() {
+            $("runFullDemoBtn").disabled = true;
+            showToast("info", "Running full gateway demo");
+            try {
+                await guardedRun("step1", runStep1);
+                await guardedRun("step2", runStep2);
+                await guardedRun("step3", runStep3);
+                await guardedRun("step4", runStep4);
+                await guardedRun("step5", runStep5);
+                showToast("success", "Full demo finished");
+            } finally {
+                $("runFullDemoBtn").disabled = false;
+            }
+        }
+
+        function resetContext() {
+            state.resumeId = "";
+            state.interviewId = "";
+            state.searchQuery = $("searchQuery").value.trim();
+            state.lastSuccessStep = "";
+            state.lastError = "";
+            state.lastRequest = null;
+            state.lastResponse = null;
+            state.lastRunAt = "";
+            Object.keys(state.steps).forEach((step) => {
+                setStepStatus(step, "idle");
+                setSummary(step, "No execution yet.");
+            });
+            $("lastRequest").textContent = "No request yet.";
+            $("lastResponse").textContent = "No response yet.";
+            updateContext();
+            showToast("info", "Runtime context reset");
+        }
+
+        $("runStep1Btn").addEventListener("click", async () => {
+            try { await guardedRun("step1", runStep1); } catch (_) {}
+        });
+        $("runStep2Btn").addEventListener("click", async () => {
+            try { await guardedRun("step2", runStep2); } catch (_) {}
+        });
+        $("runStep3Btn").addEventListener("click", async () => {
+            try { await guardedRun("step3", runStep3); } catch (_) {}
+        });
+        $("runStep4Btn").addEventListener("click", async () => {
+            try { await guardedRun("step4", runStep4); } catch (_) {}
+        });
+        $("runStep5Btn").addEventListener("click", async () => {
+            try { await guardedRun("step5", runStep5); } catch (_) {}
+        });
+        $("runFullDemoBtn").addEventListener("click", runFullDemo);
+        $("refreshHealthBtn").addEventListener("click", async () => {
+            try {
+                await refreshHealth();
+                showToast("success", "Health snapshot refreshed");
+            } catch (error) {
+                state.lastError = error.message;
+                updateContext();
+                showToast("error", error.message);
+            }
+        });
+        $("resetContextBtn").addEventListener("click", resetContext);
+
+        updateContext();
+        refreshHealth().catch((error) => {
+            state.lastError = error.message;
+            updateContext();
+            renderHealth();
+        });
+    </script>
+</body>
+</html>
