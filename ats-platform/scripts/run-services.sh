@@ -37,6 +37,26 @@ log() {
   printf '[run-services] %s\n' "$*"
 }
 
+require_port_free() {
+  local port="$1"
+  if nc -z 127.0.0.1 "$port" >/dev/null 2>&1; then
+    echo "Port $port is already in use. Stop the existing process before running run-services.sh." >&2
+    exit 1
+  fi
+}
+
+check_required_ports() {
+  local ports=(8081 9090 8082 9091 8083)
+
+  if printf '%s\n' "${SERVICES[@]}" | grep -q '^gateway:'; then
+    ports+=(8080)
+  fi
+
+  for port in "${ports[@]}"; do
+    require_port_free "$port"
+  done
+}
+
 cleanup() {
   local exit_code=$?
 
@@ -117,6 +137,8 @@ if ((BUILD_ONLY)); then
   log "build completed"
   exit 0
 fi
+
+check_required_ports
 
 trap cleanup SIGINT SIGTERM EXIT
 

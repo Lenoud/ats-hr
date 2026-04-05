@@ -83,6 +83,36 @@ func (c *consul) RegisterEndpoint(endpoint Endpoint, instanceID string) error {
 	return c.RegisterService(ServiceName(endpoint.BaseName, endpoint.Protocol), endpoint.IP, endpoint.Port, instanceID)
 }
 
+// DeregisterEndpointInstances removes stale registrations for the same service/address/port tuple.
+func (c *consul) DeregisterEndpointInstances(endpoint Endpoint) error {
+	serviceName := ServiceName(endpoint.BaseName, endpoint.Protocol)
+	services, _, err := c.client.Health().Service(serviceName, "", false, nil)
+	if err != nil {
+		return fmt.Errorf("discover existing service instances %s: %w", serviceName, err)
+	}
+
+	for _, entry := range services {
+		if entry.Service == nil {
+			continue
+		}
+
+		address := strings.TrimSpace(entry.Service.Address)
+		if address == "" && entry.Node != nil {
+			address = strings.TrimSpace(entry.Node.Address)
+		}
+
+		if address != endpoint.IP || entry.Service.Port != endpoint.Port {
+			continue
+		}
+
+		if err := c.Deregister(entry.Service.ID); err != nil {
+			return fmt.Errorf("deregister stale service instance %s: %w", entry.Service.ID, err)
+		}
+	}
+
+	return nil
+}
+
 // Deregister 注销服务
 func (c *consul) Deregister(serviceID string) error {
 	return c.client.Agent().ServiceDeregister(serviceID)

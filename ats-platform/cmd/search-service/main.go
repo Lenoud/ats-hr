@@ -170,6 +170,9 @@ func main() {
 		Port:     httpPort,
 	}
 	serviceID := consul.EndpointServiceID(httpEndpoint, instanceUUID)
+	if err := consulClient.DeregisterEndpointInstances(httpEndpoint); err != nil {
+		log.Fatalf("deregister stale service instances failed: %v", err)
+	}
 	if err := consulClient.RegisterEndpoint(httpEndpoint, instanceUUID); err != nil {
 		log.Fatalf("register service failed: %v", err)
 	}

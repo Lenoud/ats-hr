@@ -154,6 +154,12 @@ func main() {
 	}
 	httpServiceID := consul.EndpointServiceID(httpEndpoint, instanceUUID)
 	grpcServiceID := consul.EndpointServiceID(grpcEndpoint, instanceUUID)
+	if err := consulClient.DeregisterEndpointInstances(httpEndpoint); err != nil {
+		log.Fatalf("Deregister stale http service instances failed: %v", err)
+	}
+	if err := consulClient.DeregisterEndpointInstances(grpcEndpoint); err != nil {
+		log.Fatalf("Deregister stale grpc service instances failed: %v", err)
+	}
 	if err := consulClient.RegisterEndpoint(httpEndpoint, instanceUUID); err != nil {
 		log.Fatalf("RegisterService http failed: %v", err)
 	}
